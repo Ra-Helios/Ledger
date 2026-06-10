@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if edit_mode else 'Add' }} Expense — {{ proj.name }}{% endblock %}
+{% block page_title %}{{ 'Edit Expense' if edit_mode else 'Add Expense' }}{% endblock %}
+
+{% block content %}
+
+<div style="max-width:720px">
+
+  {% if edit_mode and expense %}
+  <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:var(--radius);padding:9px 14px;margin-bottom:16px;font-size:12px;color:var(--accent)">
+    Editing entry <span class="mono">#{{ expense.id }}</span>
+    · {{ expense.vendor }}
+    · {{ currency }}{{ "{:,.2f}".format(expense.amount) }}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">{{ 'Update Details' if edit_mode else 'New Entry' }}</div>
+      <div style="font-size:11px;color:var(--text-3)">{{ proj.icon }} {{ proj.name }}</div>
+    </div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-grid">
+
+          <div class="fg">
+            <label>Date</label>
+            <input type="date" name="date" required
+              value="{{ expense.date if expense else '' }}">
+          </div>
+
+          <div class="fg">
+            <label>Amount ({{ currency }})</label>
+            <input type="number" name="amount" step="0.01" min="0" required
+              placeholder="0.00"
+              value="{{ expense.amount if expense else '' }}">
+          </div>
+
+          <div class="fg">
+            <label>Category</label>
+            <select name="category" required>
+              <option value="">Select...</option>
+              {% for cat in proj.categories %}
+                <option value="{{ cat }}"
+                  {{ 'selected' if expense and expense.category == cat }}>
+                  {{ cat }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="fg">
+            <label>Payment Mode</label>
+            <select name="mode" required>
+              <option value="">Select...</option>
+              {% for m in proj.payment_modes %}
+                <option value="{{ m }}"
+                  {{ 'selected' if expense and expense.mode == m }}>
+                  {{ m }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="fg full">
+            <label>Vendor / Payee</label>
+            <input type="text" name="vendor" required
+              placeholder="Name of vendor, contractor, shop..."
+              value="{{ expense.vendor if expense else '' }}"
+              list="vendor-dl">
+            <datalist id="vendor-dl">
+              {% for v in (proj.get('known_vendors') or []) %}
+                <option value="{{ v }}">
+              {% endfor %}
+            </datalist>
+          </div>
+
+          <div class="fg full">
+            <label>Description</label>
+            <input type="text" name="description" required
+              placeholder="What was this expense for?"
+              value="{{ expense.description if expense else '' }}">
+          </div>
+
+          <div class="fg full">
+            <label>Tags</label>
+            <div class="tag-checks">
+              {% for tag in proj.tags %}
+              <input type="checkbox" id="tc_{{ tag }}" name="tags" value="{{ tag }}"
+                     class="tag-cb"
+                     {{ 'checked' if expense and expense.tags and tag in expense.tags }}>
+              <label for="tc_{{ tag }}" class="tag-lbl">{{ tag }}</label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="fg full">
+            <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(optional)</span></label>
+            <textarea name="notes" placeholder="Bill number, reference, anything extra...">{{ expense.notes if expense else '' }}</textarea>
+          </div>
+
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <a href="{{ url_for('expenses') }}" class="btn btn-ghost">Cancel</a>
+          <button type="submit" class="btn btn-primary" style="min-width:130px">
+            {{ '✓ Save Changes' if edit_mode else '➕ Add Expense' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Only auto-set today for new entries, not edits
+const d = document.querySelector('input[name="date"]');
+if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}

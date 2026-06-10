@@ -1,0 +1,44 @@
+# ── Security — NEVER push these ──────────────────────────────
+credentials.json
+token.json
+*service_account*.json
+*.key.json
+
+# ── Personal data — keep off public repo ─────────────────────
+data/
+exports/
+{data/
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environment ───────────────────────────────────────
+.env/
+.venv/
+venv/
+env/
+
+# ── OS clutter ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Flutter (ledger_viewer) ───────────────────────────────────
+ledger_viewer/.dart_tool/
+ledger_viewer/build/
+ledger_viewer/.flutter-plugins
+ledger_viewer/.flutter-plugins-dependencies
+ledger_viewer/android/.gradle/
+ledger_viewer/android/local.properties
+ledger_viewer/android/key.properties
+ledger_viewer/assets/service_account.json

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Analytics — {{ proj.name }}{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+
+<div class="three-col">
+  <div class="stat-card s-blue">
+    <div class="stat-label">Total Spent</div>
+    <div class="stat-val c-blue mono">{{ currency }}{{ "{:,.0f}".format(stats.total) }}</div>
+    <div class="stat-sub">{{ stats.count }} entries</div>
+  </div>
+  <div class="stat-card s-green">
+    <div class="stat-label">Categories Active</div>
+    <div class="stat-val c-green">{{ stats.category_breakdown|length }}</div>
+    <div class="stat-sub">of {{ proj.categories|length }} configured</div>
+  </div>
+  <div class="stat-card s-purple">
+    <div class="stat-label">Unique Vendors</div>
+    <div class="stat-val c-purple">{{ stats.vendor_breakdown|length }}</div>
+    <div class="stat-sub">across all entries</div>
+  </div>
+</div>
+
+<!-- Charts row 1 -->
+<div class="two-col mt20">
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Category Distribution</div></div>
+    <div class="card-body" style="height:260px;position:relative">
+      <canvas id="catDoughnut"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Vendor Spend</div></div>
+    <div class="card-body" style="height:260px;position:relative">
+      <canvas id="vendorBar"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Charts row 2 -->
+<div class="two-col mt12">
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Payment Modes</div></div>
+    <div class="card-body" style="height:230px;position:relative">
+      <canvas id="modePie"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Spend by Tag</div></div>
+    <div class="card-body" style="height:230px;position:relative">
+      <canvas id="tagBar"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Daily timeline -->
+<div class="card mt12">
+  <div class="card-hd"><div class="card-title">Daily Expenditure Timeline</div></div>
+  <div class="card-body" style="height:220px;position:relative">
+    <canvas id="dailyLine"></canvas>
+  </div>
+</div>
+
+<!-- Detailed breakdown tables -->
+<div class="two-col mt12">
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Category Table</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">Share</th></tr></thead>
+        <tbody>
+          {% set total = stats.total or 1 %}
+          {% for cat, amt in stats.category_breakdown.items() %}
+          <tr>
+            <td><span class="badge b-cat">{{ cat }}</span></td>
+            <td class="td-mono">{{ currency }}{{ "{:,.2f}".format(amt) }}</td>
+            <td class="mono" style="text-align:right;font-size:11px;color:var(--text-3)">{{ (amt/total*100)|round(1) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-title">Vendor Table</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Vendor</th><th style="text-align:right">Amount</th><th style="text-align:right">Share</th></tr></thead>
+        <tbody>
+          {% for v, amt in stats.vendor_breakdown.items() %}
+          <tr>
+            <td style="font-size:12px">{{ v }}</td>
+            <td class="td-mono">{{ currency }}{{ "{:,.2f}".format(amt) }}</td>
+            <td class="mono" style="text-align:right;font-size:11px;color:var(--text-3)">{{ (amt/total*100)|round(1) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316'];
+const baseCfg = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color:'#94a3b8', font:{ family:'JetBrains Mono', size:11 }, boxWidth:12, padding:14 } }
+  }
+};
+const gridColor = '#1e2230';
+const tickColor = '#475569';
+
+// Category doughnut
+new Chart(document.getElementById('catDoughnut'), {
+  type:'doughnut',
+  data:{
+    labels: {{ stats.category_breakdown.keys()|list|tojson }},
+    datasets:[{ data:{{ stats.category_breakdown.values()|list|tojson }}, backgroundColor:COLORS, borderWidth:2, borderColor:'#111318' }]
+  },
+  options:{ ...baseCfg, cutout:'58%' }
+});
+
+// Vendor bar
+new Chart(document.getElementById('vendorBar'), {
+  type:'bar',
+  data:{
+    labels: {{ stats.vendor_breakdown.keys()|list|tojson }},
+    datasets:[{
+      data: {{ stats.vendor_breakdown.values()|list|tojson }},
+      backgroundColor: COLORS.map(c=>c+'55'),
+      borderColor: COLORS,
+      borderWidth:2, borderRadius:4
+    }]
+  },
+  options:{
+    ...baseCfg,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ ticks:{color:tickColor,font:{size:10},maxRotation:30}, grid:{color:gridColor} },
+      y:{ ticks:{color:tickColor,font:{size:10},callback:v=>'₹'+v.toLocaleString()}, grid:{color:gridColor} }
+    }
+  }
+});
+
+// Mode pie
+new Chart(document.getElementById('modePie'), {
+  type:'pie',
+  data:{
+    labels: {{ stats.mode_breakdown.keys()|list|tojson }},
+    datasets:[{
+      data: {{ stats.mode_breakdown.values()|list|tojson }},
+      backgroundColor:['#10b98155','#3b82f655','#8b5cf655','#f59e0b55','#ec489955'],
+      borderColor:    ['#10b981',  '#3b82f6',  '#8b5cf6',  '#f59e0b',  '#ec4899'],
+      borderWidth:2
+    }]
+  },
+  options: baseCfg
+});
+
+// Tag horizontal bar
+new Chart(document.getElementById('tagBar'), {
+  type:'bar',
+  data:{
+    labels: {{ stats.tag_breakdown.keys()|list|tojson }},
+    datasets:[{
+      data: {{ stats.tag_breakdown.values()|list|tojson }},
+      backgroundColor: COLORS.map(c=>c+'55'),
+      borderColor: COLORS, borderWidth:2, borderRadius:4
+    }]
+  },
+  options:{
+    ...baseCfg, indexAxis:'y',
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ ticks:{color:tickColor,font:{size:10},callback:v=>'₹'+v.toLocaleString()}, grid:{color:gridColor} },
+      y:{ ticks:{color:tickColor,font:{size:11}}, grid:{color:'#181b22'} }
+    }
+  }
+});
+
+// Daily line
+const daily = {{ stats.daily|tojson }};
+new Chart(document.getElementById('dailyLine'), {
+  type:'line',
+  data:{
+    labels: Object.keys(daily),
+    datasets:[{
+      data: Object.values(daily),
+      borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
+      borderWidth:2, pointBackgroundColor:'#3b82f6',
+      pointRadius:4, fill:true, tension:0.35
+    }]
+  },
+  options:{
+    ...baseCfg,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ ticks:{color:tickColor,font:{size:10}}, grid:{color:gridColor} },
+      y:{ ticks:{color:tickColor,font:{size:10},callback:v=>'₹'+v.toLocaleString()}, grid:{color:gridColor} }
+    }
+  }
+});
+</script>
+{% endblock %}

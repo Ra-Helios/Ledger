@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Expenses — {{ proj.name }}{% endblock %}
+{% block page_title %}Expenses{% endblock %}
+
+{% block content %}
+
+<!-- Filter bar -->
+<form method="GET" action="{{ url_for('expenses') }}">
+<div class="filter-bar">
+  <div class="fg" style="min-width:160px;flex:2">
+    <label>🔍 Search</label>
+    <input type="text" name="search" placeholder="vendor, description, notes..." value="{{ filters.search }}">
+  </div>
+  <div class="fg">
+    <label>Category</label>
+    <select name="category">
+      <option value="">All</option>
+      {% for cat in proj.categories %}
+        <option value="{{ cat }}" {{ 'selected' if filters.category == cat }}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="fg">
+    <label>Vendor</label>
+    <input type="text" name="vendor" placeholder="any vendor..." value="{{ filters.vendor }}">
+  </div>
+  <div class="fg">
+    <label>Mode</label>
+    <select name="mode">
+      <option value="">All</option>
+      {% for m in proj.payment_modes %}
+        <option value="{{ m }}" {{ 'selected' if filters.mode == m }}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="fg">
+    <label>Tag</label>
+    <select name="tag">
+      <option value="">All</option>
+      {% for t in proj.tags %}
+        <option value="{{ t }}" {{ 'selected' if filters.tag == t }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="fg">
+    <label>From</label>
+    <input type="date" name="date_from" value="{{ filters.date_from }}">
+  </div>
+  <div class="fg">
+    <label>To</label>
+    <input type="date" name="date_to" value="{{ filters.date_to }}">
+  </div>
+  <div class="fg" style="min-width:90px">
+    <label>Min {{ currency }}</label>
+    <input type="number" name="min_amount" placeholder="0" value="{{ filters.min_amount }}">
+  </div>
+  <div class="fg" style="min-width:90px">
+    <label>Max {{ currency }}</label>
+    <input type="number" name="max_amount" placeholder="∞" value="{{ filters.max_amount }}">
+  </div>
+  <div class="fg" style="min-width:130px">
+    <label>Sort</label>
+    <select name="sort">
+      <option value="date_desc"   {{ 'selected' if filters.sort=='date_desc' }}>Date ↓ (newest)</option>
+      <option value="date_asc"    {{ 'selected' if filters.sort=='date_asc'  }}>Date ↑ (oldest)</option>
+      <option value="amount_desc" {{ 'selected' if filters.sort=='amount_desc' }}>Amount ↓</option>
+      <option value="amount_asc"  {{ 'selected' if filters.sort=='amount_asc'  }}>Amount ↑</option>
+      <option value="id_desc"     {{ 'selected' if filters.sort=='id_desc' }}>Entry # ↓ (newest)</option>
+      <option value="id_asc"      {{ 'selected' if filters.sort=='id_asc'  }}>Entry # ↑ (oldest)</option>
+    </select>
+  </div>
+  <div style="display:flex;gap:6px;align-self:flex-end">
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a href="{{ url_for('expenses') }}" class="btn btn-ghost btn-sm">Clear</a>
+  </div>
+</div>
+</form>
+
+<!-- Summary bar -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  <div style="font-size:12px;color:var(--text-2)">
+    <strong style="color:var(--accent)">{{ expenses|length }}</strong> entries
+    &nbsp;·&nbsp; Total: <strong class="mono" style="color:var(--yellow)">{{ currency }}{{ "{:,.2f}".format(total) }}</strong>
+  </div>
+  <a href="{{ url_for('export') }}" class="btn btn-ghost btn-sm">📥 Export</a>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <div class="tbl-wrap">
+    {% if expenses %}
+    <table>
+      <thead>
+        <tr>
+          <th title="Entry ID — order added">#</th>
+          <th>Date</th>
+          <th>Category</th>
+          <th>Vendor / Payee</th>
+          <th>Description</th>
+          <th>Tags</th>
+          <th>Mode</th>
+          <th style="text-align:right">Amount</th>
+          <th style="width:90px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td class="mono" style="color:var(--text-3);font-size:11px;font-weight:600">{{ e.id }}</td>
+          <td class="mono" style="font-size:11px;color:var(--text-2)">{{ e.date }}</td>
+          <td><span class="badge b-cat">{{ e.category }}</span></td>
+          <td style="font-weight:500;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ e.vendor }}">{{ e.vendor }}</td>
+          <td style="color:var(--text-2);max-width:200px">
+            {{ e.description }}
+            {% if e.notes %}
+              <br><span style="font-size:10px;color:var(--text-3)">📝 {{ e.notes }}</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap">
+            {% for tag in e.tags %}<span class="badge b-tag">{{ tag }}</span>{% endfor %}
+          </td>
+          <td>
+            {% set bc = 'b-cash' if e.mode=='Cash' else ('b-gpay' if e.mode=='Gpay' else ('b-upi' if e.mode=='UPI' else ('b-cheque' if e.mode=='Cheque' else 'b-bank'))) %}
+            <span class="badge {{ bc }}">{{ e.mode }}</span>
+          </td>
+          <td class="td-mono">{{ currency }}{{ "{:,.2f}".format(e.amount) }}</td>
+          <td>
+            <div class="row-actions">
+              <a href="{{ url_for('edit', eid=e.id) }}" class="btn btn-ghost btn-xs" title="Edit">✏️ Edit</a>
+              <button onclick="confirmDel({{ e.id }}, '{{ e.description|replace("'","\\'")|replace('"','') }}')"
+                      class="btn btn-xs" style="background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)" title="Delete">🗑</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="7" style="text-align:right;font-size:11px;color:var(--text-2);letter-spacing:.5px">
+            TOTAL ({{ expenses|length }} entries)
+          </td>
+          <td class="td-mono" style="color:var(--accent);font-size:15px">{{ currency }}{{ "{:,.2f}".format(total) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <div class="empty">
+      <div class="ei">📭</div>
+      <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">No expenses found</div>
+      <div style="font-size:12px;margin-bottom:16px">Try adjusting filters or add a new one from the top right</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="modal-bg" id="delModal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--red)">Delete Expense?</div>
+    <div class="modal-body">
+      Remove: <strong id="delDesc"></strong><br>
+      <span style="font-size:11px;color:var(--text-3)">This cannot be undone.</span>
+    </div>
+    <div class="modal-foot">
+      <button onclick="closeDel()" class="btn btn-secondary">Cancel</button>
+      <form id="delForm" method="POST">
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDel(id, desc) {
+  document.getElementById('delDesc').textContent = desc;
+  document.getElementById('delForm').action = '/delete/' + id;
+  document.getElementById('delModal').classList.add('open');
+}
+function closeDel() { document.getElementById('delModal').classList.remove('open'); }
+document.getElementById('delModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDel();
+});
+</script>
+{% endblock %}

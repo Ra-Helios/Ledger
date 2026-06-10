@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Ledger{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0a0c10;
+      --surface:   #111318;
+      --surface2:  #181b22;
+      --surface3:  #1e2230;
+      --border:    #252a38;
+      --border2:   #2e3548;
+      --accent:    #3b82f6;
+      --accent-d:  #2563eb;
+      --accent-g:  rgba(59,130,246,.12);
+      --green:     #10b981;
+      --red:       #ef4444;
+      --yellow:    #f59e0b;
+      --purple:    #8b5cf6;
+      --cyan:      #06b6d4;
+      --pink:      #ec4899;
+      --text:      #e2e8f0;
+      --text-2:    #94a3b8;
+      --text-3:    #475569;
+      --font:      'Inter', sans-serif;
+      --mono:      'JetBrains Mono', monospace;
+      --radius:    6px;
+      --sidebar-w: 230px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0;
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 200; overflow: hidden;
+    }
+    .sidebar-brand {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .brand-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--accent); display: flex;
+      align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .brand-text { font-size: 15px; font-weight: 700; color: var(--text); }
+    .brand-sub  { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
+
+    /* Nav */
+    .nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+    .nav-section {
+      padding: 10px 16px 4px;
+      font-size: 9px; font-weight: 700;
+      color: var(--text-3); letter-spacing: 2px; text-transform: uppercase;
+    }
+    .nav a {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 16px;
+      color: var(--text-2); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      border-left: 2px solid transparent;
+      transition: all .12s;
+    }
+    .nav a:hover  { color: var(--text); background: var(--surface2); }
+    .nav a.active { color: var(--accent); background: var(--accent-g); border-left-color: var(--accent); }
+    .nav a .ni    { font-size: 14px; width: 16px; text-align: center; opacity: .8; }
+
+    /* Project items in sidebar */
+    .nav a.proj-nav-current {
+      color: var(--accent);
+      background: var(--accent-g);
+      border-left-color: var(--accent);
+      font-weight: 600;
+    }
+    .nav a.proj-nav-other { color: var(--text-3); font-size: 12px; }
+    .nav a.proj-nav-other:hover { color: var(--text-2); }
+
+    .sidebar-foot {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 10px; color: var(--text-3); font-family: var(--mono);
+    }
+
+    /* ── Main ── */
+    .main { margin-left: var(--sidebar-w); min-height: 100vh; }
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .page-title { font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .page-title .proj-badge {
+      font-size: 11px; font-weight: 600; color: var(--accent);
+      background: var(--accent-g); border: 1px solid rgba(59,130,246,.25);
+      border-radius: 4px; padding: 2px 8px;
+    }
+    .topbar-right { display: flex; gap: 8px; align-items: center; }
+    .content { padding: 20px 24px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border-radius: var(--radius);
+      font-size: 12px; font-weight: 600;
+      border: none; cursor: pointer; text-decoration: none;
+      transition: all .12s; white-space: nowrap;
+      font-family: var(--font);
+    }
+    .btn-primary   { background: var(--accent); color: #fff; }
+    .btn-primary:hover  { background: var(--accent-d); }
+    .btn-secondary { background: var(--surface2); color: var(--text-2); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--border2); color: var(--text); }
+    .btn-danger    { background: var(--red); color: #fff; }
+    .btn-danger:hover   { background: #dc2626; }
+    .btn-ghost     { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+    .btn-ghost:hover    { color: var(--text); border-color: var(--border2); }
+    .btn-sm { padding: 5px 10px; font-size: 11px; }
+    .btn-xs { padding: 3px 7px; font-size: 10px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-hd {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-title { font-size: 12px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .8px; }
+    .card-body  { padding: 16px; }
+
+    /* ── Stat Cards ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px; position: relative; overflow: hidden;
+    }
+    .stat-card::after {
+      content: ''; position: absolute;
+      bottom: 0; left: 0; right: 0; height: 2px;
+    }
+    .s-blue::after   { background: var(--accent); }
+    .s-green::after  { background: var(--green); }
+    .s-yellow::after { background: var(--yellow); }
+    .s-purple::after { background: var(--purple); }
+    .s-cyan::after   { background: var(--cyan); }
+    .stat-label { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 1.2px; }
+    .stat-val   { font-size: 26px; font-weight: 700; font-family: var(--mono); margin-top: 4px; line-height: 1; }
+    .stat-sub   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
+    .stat-icon  { position: absolute; right: 12px; top: 12px; font-size: 22px; opacity: .1; }
+    .c-blue   { color: var(--accent); }
+    .c-green  { color: var(--green); }
+    .c-yellow { color: var(--yellow); }
+    .c-purple { color: var(--purple); }
+
+    /* ── Table ── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--surface2);
+      padding: 9px 12px;
+      text-align: left; white-space: nowrap;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-3);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(37,42,56,.6);
+      font-size: 13px; color: var(--text); vertical-align: middle;
+    }
+    tr:hover td { background: rgba(30,34,48,.6); }
+    .td-mono { font-family: var(--mono); color: var(--yellow); text-align: right; white-space: nowrap; }
+    tfoot td { background: var(--surface3) !important; font-weight: 700; border-top: 1px solid var(--border2); }
+
+    /* ── Row action buttons — hidden, slide in on hover ── */
+    .row-actions {
+      display: flex; gap: 4px; justify-content: flex-end;
+      opacity: 0;
+      transform: translateX(8px);
+      transition: opacity .18s, transform .18s;
+    }
+    tr:hover .row-actions {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 7px; border-radius: 4px;
+      font-size: 10px; font-weight: 600; font-family: var(--mono);
+      letter-spacing: .3px;
+    }
+    .b-cash   { background:rgba(16,185,129,.15);  color:var(--green);  border:1px solid rgba(16,185,129,.25); }
+    .b-gpay   { background:rgba(59,130,246,.15);  color:var(--accent); border:1px solid rgba(59,130,246,.25); }
+    .b-bank   { background:rgba(139,92,246,.15);  color:var(--purple); border:1px solid rgba(139,92,246,.25); }
+    .b-upi    { background:rgba(245,158,11,.15);  color:var(--yellow); border:1px solid rgba(245,158,11,.25); }
+    .b-cheque { background:rgba(236,72,153,.15);  color:var(--pink);   border:1px solid rgba(236,72,153,.25); }
+    .b-cat    { background:rgba(59,130,246,.1);   color:var(--accent); border:1px solid rgba(59,130,246,.2);  font-size:11px; }
+    .b-tag    { background:var(--surface3);       color:var(--text-2); border:1px solid var(--border); font-size:9px; margin:1px; }
+
+    /* ── Forms ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .fg       { display: flex; flex-direction: column; gap: 5px; }
+    .fg.full  { grid-column: 1/-1; }
+    label     { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .8px; }
+    input, select, textarea {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      padding: 8px 11px; font-family: var(--font); font-size: 13px; width: 100%;
+      transition: border-color .12s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-g);
+    }
+    input::placeholder { color: var(--text-3); }
+    select option { background: var(--surface2); }
+    textarea { resize: vertical; min-height: 70px; }
+    .tag-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag-cb { display: none; }
+    .tag-lbl {
+      padding: 4px 10px; border-radius: 4px; cursor: pointer;
+      background: var(--surface2); color: var(--text-2);
+      border: 1px solid var(--border); font-size: 11px;
+      font-family: var(--mono); transition: all .12s;
+    }
+    .tag-cb:checked + .tag-lbl {
+      background: var(--accent-g); color: var(--accent);
+      border-color: rgba(59,130,246,.4);
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+      margin-bottom: 14px;
+    }
+    .filter-bar .fg { min-width: 110px; flex: 1; }
+    .filter-bar label { font-size: 9px; }
+    .filter-bar input, .filter-bar select { padding: 6px 9px; font-size: 12px; }
+
+    /* ── Progress ── */
+    .prog { background: var(--surface3); border-radius: 2px; height: 4px; overflow: hidden; margin-top: 4px; }
+    .prog-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+
+    /* ── Flash ── */
+    .flash-wrap { padding: 0 24px; margin-top: 10px; }
+    .flash {
+      padding: 9px 14px; border-radius: var(--radius);
+      font-size: 12px; display: flex; align-items: center; gap: 7px;
+      margin-bottom: 6px;
+    }
+    .flash.success { background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25); color:var(--green); }
+    .flash.error   { background:rgba(239,68,68,.12);  border:1px solid rgba(239,68,68,.25);  color:var(--red); }
+
+    /* ── Modal ── */
+    .modal-bg {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 24px; width: 380px; max-width: 90%;
+    }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .modal-body  { color: var(--text-2); font-size: 13px; margin-bottom: 20px; }
+    .modal-foot  { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ── Layout helpers ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .mt12 { margin-top: 12px; }
+    .mt20 { margin-top: 20px; }
+    .empty { text-align: center; padding: 50px 20px; color: var(--text-3); }
+    .empty .ei { font-size: 36px; margin-bottom: 10px; }
+    a { color: inherit; }
+    .mono { font-family: var(--mono); }
+
+    @media (max-width: 860px) {
+      :root { --sidebar-w: 52px; }
+      .sidebar-brand .brand-text, .brand-sub,
+      .nav-section, .nav a span:not(.ni), .sidebar-foot { display: none; }
+      .stat-grid { grid-template-columns: repeat(2,1fr); }
+      .two-col, .three-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">📒</div>
+    <div>
+      <div class="brand-text">Ledger</div>
+      <div class="brand-sub">multi-project</div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-section">Overview</div>
+    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">
+      <span class="ni">📊</span><span>Dashboard</span>
+    </a>
+
+    <div class="nav-section">Expenses</div>
+    <a href="{{ url_for('expenses') }}" class="{{ 'active' if request.endpoint in ['expenses','add','edit'] }}">
+      <span class="ni">📋</span><span>All Expenses</span>
+    </a>
+
+    <div class="nav-section">Projects</div>
+    <a href="{{ url_for('project_settings') }}" class="{{ 'active' if request.endpoint=='project_settings' }}">
+      <span class="ni">⚙️</span><span>Settings</span>
+    </a>
+    <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' }}">
+      <span class="ni">🗂</span><span>All Projects</span>
+    </a>
+
+    {% if g.projects %}
+      {% for p in g.projects|sort(attribute='created') %}
+        {% if p.slug == g.active_slug %}
+        <a href="{{ url_for('switch', slug=p.slug) }}" class="proj-nav-current">
+          <span class="ni">{{ p.icon }}</span><span>{{ p.name }}</span>
+        </a>
+        {% else %}
+        <a href="{{ url_for('switch', slug=p.slug) }}" class="proj-nav-other">
+          <span class="ni">{{ p.icon }}</span><span>{{ p.name }}</span>
+        </a>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    <a href="{{ url_for('new_project') }}" class="{{ 'active' if request.endpoint=='new_project' }}" style="color:var(--accent)">
+      <span class="ni">＋</span><span>New Project</span>
+    </a>
+  </div>
+
+  <div class="sidebar-foot">
+    <form method="POST" action="{{ url_for('do_backup') }}" style="display:inline">
+      <button type="submit" style="all:unset;cursor:pointer;color:var(--text-3);font-size:10px">
+        💾 Backup
+      </button>
+    </form>
+  </div>
+</nav>
+
+<!-- ── Main ── -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title">
+      {% block page_title %}Ledger{% endblock %}
+      {% if g.active_proj %}
+        <span class="proj-badge">{{ g.active_proj.icon }} {{ g.active_proj.name }}</span>
+      {% endif %}
+    </div>
+    <div class="topbar-right">
+      {% if g.active_slug %}
+      <a href="{{ url_for('add') }}" class="btn btn-primary">＋ Add Expense</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-wrap">
+      {% for cat, msg in messages %}
+      <div class="flash {{ cat }}">{{ '✓' if cat=='success' else '✗' }} {{ msg }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script>
+function modeBadge(mode) {
+  const m = { Cash:'b-cash', Gpay:'b-gpay', 'Bank Transfer':'b-bank', UPI:'b-upi', Cheque:'b-cheque' };
+  return m[mode] || 'b-tag';
+}
+</script>
+</body>
+</html>

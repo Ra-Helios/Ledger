@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}New Project — Ledger{% endblock %}
+{% block page_title %}New Project{% endblock %}
+
+{% block content %}
+<div style="max-width:600px">
+
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">Create Project</div>
+    </div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-grid">
+
+          <div class="fg" style="grid-column:1;flex-direction:row;align-items:flex-end;gap:8px">
+            <div style="flex-shrink:0">
+              <label>Icon</label>
+              <input type="text" name="icon" value="📁"
+                style="width:60px;text-align:center;font-size:20px;padding:6px"
+                maxlength="4" id="iconInput">
+            </div>
+            <div style="flex:1">
+              <label>Project Name *</label>
+              <input type="text" name="name" required placeholder="e.g. Home Renovation, College Fees, Business..." autofocus>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label>Currency Override <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-3)">(leave blank to use global)</span></label>
+            <input type="text" name="currency" placeholder="₹  $  €  ..." maxlength="4" style="width:80px">
+          </div>
+
+          <div class="fg full">
+            <label>Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(optional)</span></label>
+            <input type="text" name="description" placeholder="Short description of this project...">
+          </div>
+
+          <div class="fg full">
+            <label>Categories <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(one per line)</span></label>
+            <textarea name="categories" rows="6"
+              placeholder="e.g.&#10;Groceries&#10;Transport&#10;Utilities&#10;Rent&#10;Entertainment"></textarea>
+            <div style="font-size:10px;color:var(--text-3);margin-top:4px">You can add / rename these later in Project Settings</div>
+          </div>
+
+        </div>
+
+        <!-- Quick templates -->
+        <div style="margin-top:12px">
+          <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Quick Templates</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="templates">
+            <button type="button" class="btn btn-ghost btn-xs" onclick="applyTemplate('home')">🏗 Home Renovation</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="applyTemplate('personal')">👤 Personal Finance</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="applyTemplate('business')">💼 Business</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="applyTemplate('travel')">✈️ Travel</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="applyTemplate('education')">🎓 Education</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:14px;border-top:1px solid var(--border)">
+          <a href="{{ url_for('home') }}" class="btn btn-ghost">Cancel</a>
+          <button type="submit" class="btn btn-primary">Create Project →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const templates = {
+  home: {
+    icon:'🏗', name:'Home Renovation',
+    cats:`Demolishing\nCarpenter Works\nPainting Works\nDrainage Works\nElectrical & Plumbing\nCement & Sand\nTiling Works\nMiscellaneous`
+  },
+  personal: {
+    icon:'👤', name:'Personal Finance',
+    cats:`Groceries\nTransport\nUtilities\nRent\nHealthcare\nEntertainment\nClothing\nMiscellaneous`
+  },
+  business: {
+    icon:'💼', name:'Business Expenses',
+    cats:`Office Supplies\nTravel\nSoftware & Subscriptions\nMarketing\nSalaries\nEquipment\nMaintenance\nMiscellaneous`
+  },
+  travel: {
+    icon:'✈️', name:'Travel',
+    cats:`Flights\nAccommodation\nFood & Drinks\nTransport\nActivities\nShopping\nVisa & Documentation\nMiscellaneous`
+  },
+  education: {
+    icon:'🎓', name:'Education',
+    cats:`Tuition Fees\nBooks & Stationery\nHostel\nFood\nTransport\nExam Fees\nOnline Courses\nMiscellaneous`
+  },
+};
+function applyTemplate(key) {
+  const t = templates[key];
+  document.querySelector('input[name="icon"]').value = t.icon;
+  document.querySelector('input[name="name"]').value = t.name;
+  document.querySelector('textarea[name="categories"]').value = t.cats;
+}
+</script>
+{% endblock %}

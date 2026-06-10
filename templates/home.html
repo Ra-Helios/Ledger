@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}All Projects — Ledger{% endblock %}
+{% block page_title %}All Projects{% endblock %}
+
+{% block content %}
+{% set meta = g.meta %}
+{% set cur = meta.currency %}
+
+<!-- Grand total strip -->
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:4px">Combined Total — All Projects</div>
+    <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--accent)">{{ cur }}{{ "{:,.2f}".format(grand_total) }}</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="{{ url_for('new_project') }}" class="btn btn-primary">＋ New Project</a>
+    <form method="POST" action="{{ url_for('do_backup') }}">
+      <button class="btn btn-secondary">💾 Backup All</button>
+    </form>
+  </div>
+</div>
+
+{% if summary %}
+<!-- Project Cards Grid -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+  {% for proj in summary %}
+  <div class="card" style="transition:border-color .15s" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div class="card-hd" style="gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <div style="font-size:22px;flex-shrink:0">{{ proj.icon }}</div>
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ proj.name }}</div>
+          <div style="font-size:10px;color:var(--text-3);font-family:var(--mono)">{{ proj.count }} entries</div>
+        </div>
+      </div>
+      <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--yellow);flex-shrink:0">
+        {{ cur }}{{ "{:,.0f}".format(proj.total) }}
+      </div>
+    </div>
+    <div style="padding:12px 16px;display:flex;gap:8px">
+      <a href="{{ url_for('switch', slug=proj.slug) }}?next=dashboard"
+         onclick="return switchAndGo('{{ proj.slug }}', '{{ url_for('dashboard') }}')"
+         class="btn btn-primary btn-sm" style="flex:1;justify-content:center">
+        Open →
+      </a>
+      <a href="{{ url_for('switch', slug=proj.slug) }}"
+         class="btn btn-secondary btn-sm">Switch</a>
+      <button onclick="confirmDelProj('{{ proj.slug }}','{{ proj.name }}')"
+              class="btn btn-ghost btn-sm" style="color:var(--red);border-color:transparent">🗑</button>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- New Project card -->
+  <a href="{{ url_for('new_project') }}" class="card" style="display:flex;align-items:center;justify-content:center;min-height:110px;text-decoration:none;border-style:dashed;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">
+    <div style="text-align:center;color:var(--text-2)">
+      <div style="font-size:24px;margin-bottom:6px">＋</div>
+      <div style="font-size:12px;font-weight:600">New Project</div>
+    </div>
+  </a>
+</div>
+
+{% else %}
+<div class="empty">
+  <div class="ei">📁</div>
+  <div style="font-size:16px;color:var(--text-2);margin-bottom:8px">No projects yet</div>
+  <div style="margin-bottom:20px;font-size:13px">Create your first project to start tracking expenses</div>
+  <a href="{{ url_for('new_project') }}" class="btn btn-primary">＋ Create First Project</a>
+</div>
+{% endif %}
+
+<!-- Delete project modal -->
+<div class="modal-bg" id="delProjModal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--red)">⚠ Delete Project</div>
+    <div class="modal-body">
+      Delete <strong id="delProjName"></strong>?<br>
+      All expenses in this project will be permanently removed.
+    </div>
+    <div class="modal-foot">
+      <button onclick="closeDelProj()" class="btn btn-secondary">Cancel</button>
+      <form id="delProjForm" method="POST">
+        <button type="submit" class="btn btn-danger">Delete Project</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelProj(slug, name) {
+  document.getElementById('delProjName').textContent = name;
+  document.getElementById('delProjForm').action = '/projects/delete/' + slug;
+  document.getElementById('delProjModal').classList.add('open');
+}
+function closeDelProj() {
+  document.getElementById('delProjModal').classList.remove('open');
+}
+document.getElementById('delProjModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDelProj();
+});
+function switchAndGo(slug, dest) {
+  fetch('/switch/' + slug).then(() => { window.location = dest; });
+  return false;
+}
+</script>
+{% endblock %}

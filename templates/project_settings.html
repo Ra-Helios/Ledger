@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Settings — {{ proj.name }}{% endblock %}
+{% block page_title %}Project Settings{% endblock %}
+
+{% block content %}
+<div style="max-width:700px">
+
+  <!-- ── Drive Conflict Banner ── -->
+  {% set conflict = session.get('drive_conflict') %}
+  {% if conflict %}
+
+  {% if conflict.status == 'diverged' %}
+  <!-- ── TRUE DIVERGE — both sides have unique entries ── -->
+  <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px">
+    <div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:6px">⚠ Both Devices Have Unsynced Entries</div>
+    <div style="font-size:12px;color:var(--text-2);margin-bottom:14px;line-height:1.7">
+      You added entries on this device and also on another device without syncing in between.
+      Neither side is a full copy — they have diverged. <strong style="color:var(--text)">You need to manually merge them</strong>
+      by opening both JSONs and combining the entries, then push the merged version.
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;min-width:140px">
+        <div style="font-size:10px;color:var(--text-3);margin-bottom:4px">THIS DEVICE ONLY</div>
+        <div class="mono" style="font-size:13px;font-weight:700;color:var(--accent)">
+          {{ conflict.local_count }} entries total
+        </div>
+        <div style="font-size:10px;color:var(--text-2);margin-top:4px">
+          Unique IDs not on Drive:<br>
+          <span class="mono" style="color:var(--accent)">{{ conflict.local_only_ids | join(', ') }}</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--text-3);font-size:18px;padding:0 4px">✕</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;min-width:140px">
+        <div style="font-size:10px;color:var(--text-3);margin-bottom:4px">DRIVE ONLY</div>
+        <div class="mono" style="font-size:13px;font-weight:700;color:var(--yellow)">
+          {{ conflict.drive_count }} entries total
+        </div>
+        <div style="font-size:10px;color:var(--text-2);margin-top:4px">
+          Unique IDs not on this device:<br>
+          <span class="mono" style="color:var(--yellow)">{{ conflict.drive_only_ids | join(', ') }}</span>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:12px;padding:8px 10px;background:var(--surface3);border-radius:4px;line-height:1.6">
+      <strong style="color:var(--text-2)">How to fix:</strong>
+      Open <span class="mono">data/projects/{{ g.active_slug }}.json</span> on this device and the copy on Drive.
+      Copy the missing entries from each into one combined file, update <span class="mono">next_id</span>
+      to be the highest ID + 1, save it locally, then click Save to Drive.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <form method="POST" action="{{ url_for('drive_push') }}">
+        <button class="btn btn-danger btn-sm" onclick="return confirm('This will overwrite Drive with local data. Drive-only entries will be LOST. Are you sure?')">
+          Force Push Local → Drive (lose Drive entries)
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('drive_force_pull') }}">
+        <button class="btn btn-danger btn-sm" onclick="return confirm('This will overwrite local with Drive data. Local-only entries will be LOST. Are you sure?')">
+          Force Pull Drive → Local (lose local entries)
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('drive_dismiss_conflict') }}">
+        <button class="btn btn-ghost btn-sm">Dismiss — I will fix manually</button>
+      </form>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- ── SIMPLE CONFLICT — one side is just ahead ── -->
+  <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px">
+    <div style="font-size:14px;font-weight:700;color:var(--yellow);margin-bottom:6px">⚠ Drive Sync Conflict</div>
+    <div style="font-size:12px;color:var(--text-2);margin-bottom:12px;line-height:1.6">
+      {{ conflict.message }}
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:120px">
+        <div style="font-size:10px;color:var(--text-3);margin-bottom:2px">LOCAL</div>
+        <div class="mono" style="font-size:18px;font-weight:700;color:var(--accent)">{{ conflict.local_count }} entries</div>
+        <div style="font-size:10px;color:var(--text-3)">next_id={{ conflict.local_next_id }}</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--text-3);font-size:18px">vs</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:120px">
+        <div style="font-size:10px;color:var(--text-3);margin-bottom:2px">DRIVE</div>
+        <div class="mono" style="font-size:18px;font-weight:700;color:var(--yellow)">{{ conflict.drive_count }} entries</div>
+        <div style="font-size:10px;color:var(--text-3)">next_id={{ conflict.drive_next_id }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% if conflict.local_only_ids and not conflict.drive_only_ids %}
+        <form method="POST" action="{{ url_for('drive_push') }}">
+          <button class="btn btn-primary btn-sm">Push Local → Drive (local has more entries)</button>
+        </form>
+      {% else %}
+        <form method="POST" action="{{ url_for('drive_force_pull') }}">
+          <button class="btn btn-primary btn-sm">Pull Drive → Local (Drive has more entries)</button>
+        </form>
+      {% endif %}
+      <form method="POST" action="{{ url_for('drive_dismiss_conflict') }}">
+        <button class="btn btn-ghost btn-sm">Dismiss</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+  <!-- ── Google Drive Sync ── -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd">
+      <div class="card-title">☁ Google Drive Sync</div>
+      <div id="driveStatus" style="font-size:10px;color:var(--text-3);font-family:var(--mono)">checking...</div>
+    </div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:14px;line-height:1.6">
+        Saves <strong style="color:var(--text)">{{ proj.icon }} {{ proj.name }}</strong>'s JSON directly to your Google Drive
+        under <span class="mono" style="color:var(--accent)">LedgerJsons/{{ g.active_slug }}.json</span>.
+        Access it from any laptop using the same Google account.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <form method="POST" action="{{ url_for('drive_push') }}">
+          <button class="btn btn-primary" id="pushBtn">
+            ☁ Save to Drive
+          </button>
+        </form>
+        <form method="POST" action="{{ url_for('drive_pull') }}">
+          <button class="btn btn-secondary" id="pullBtn">
+            ⬇ Fetch from Drive
+          </button>
+        </form>
+      </div>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);font-size:11px;color:var(--text-3);line-height:1.7">
+        <strong style="color:var(--text-2)">How it works:</strong><br>
+        • <strong>Save to Drive</strong> — pushes your local JSON up. If Drive has newer data it'll warn you first.<br>
+        • <strong>Fetch from Drive</strong> — pulls Drive JSON to this machine. Safe if Drive is ahead; warns if local is newer.<br>
+        • First time on a new laptop: clicking either button opens a browser login once, then it's automatic.<br>
+        • Make sure <span class="mono" style="color:var(--accent)">credentials.json</span> is in the project root folder on both laptops.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Project Settings Form ── -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">⚙ {{ proj.name }}</div>
+      <div style="font-size:10px;color:var(--text-3);font-family:var(--mono)">slug: {{ slug }}</div>
+    </div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-grid">
+
+          <div class="fg" style="flex-direction:row;align-items:flex-end;gap:8px;grid-column:1/-1">
+            <div style="flex-shrink:0">
+              <label>Icon</label>
+              <input type="text" name="icon" value="{{ proj.icon }}"
+                style="width:60px;text-align:center;font-size:20px;padding:6px" maxlength="4">
+            </div>
+            <div style="flex:1">
+              <label>Project Name</label>
+              <input type="text" name="name" value="{{ proj.name }}" required>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label>Currency Symbol</label>
+            <input type="text" name="currency" value="{{ proj.currency or '' }}"
+              placeholder="Leave blank to use global ({{ g.meta.currency }})" maxlength="4">
+          </div>
+
+          <div class="fg">
+            <label>Description</label>
+            <input type="text" name="description" value="{{ proj.description or '' }}"
+              placeholder="Short description...">
+          </div>
+
+          <div class="fg full">
+            <label>Categories <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(one per line)</span></label>
+            <textarea name="categories" rows="8">{{ proj.categories|join('\n') }}</textarea>
+          </div>
+
+          <div class="fg">
+            <label>Payment Modes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(one per line)</span></label>
+            <textarea name="payment_modes" rows="6">{{ proj.payment_modes|join('\n') }}</textarea>
+          </div>
+
+          <div class="fg">
+            <label>Tags <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(one per line)</span></label>
+            <textarea name="tags" rows="6">{{ proj.tags|join('\n') }}</textarea>
+          </div>
+
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Danger Zone ── -->
+  <div class="card mt12" style="border-color:rgba(239,68,68,.2)">
+    <div class="card-hd" style="border-color:rgba(239,68,68,.15)">
+      <div class="card-title" style="color:var(--red)">⚠ Danger Zone</div>
+    </div>
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:3px">Delete this project</div>
+        <div style="font-size:11px;color:var(--text-3)">Permanently removes all {{ proj.expenses|length }} expense entries. Does not delete the Drive backup.</div>
+      </div>
+      <button onclick="document.getElementById('delProjModal').classList.add('open')"
+              class="btn btn-danger btn-sm" style="flex-shrink:0">Delete Project</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-bg" id="delProjModal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--red)">Delete Project?</div>
+    <div class="modal-body">
+      Permanently delete <strong>{{ proj.icon }} {{ proj.name }}</strong> and all its expenses?<br>
+      <span style="font-size:11px;color:var(--text-3)">This cannot be undone. Drive backup will not be deleted.</span>
+    </div>
+    <div class="modal-foot">
+      <button onclick="document.getElementById('delProjModal').classList.remove('open')"
+              class="btn btn-secondary">Cancel</button>
+      <form method="POST" action="{{ url_for('remove_project', slug=slug) }}">
+        <button type="submit" class="btn btn-danger">Delete Forever</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Show Drive auth status badge
+fetch('/api/drive/status')
+  .then(r => r.json())
+  .then(data => {
+    const el = document.getElementById('driveStatus');
+    if (!data.has_credentials) {
+      el.textContent = '⚠ credentials.json missing';
+      el.style.color = 'var(--red)';
+    } else if (data.authenticated) {
+      el.textContent = '● connected';
+      el.style.color = 'var(--green)';
+    } else {
+      el.textContent = '○ not logged in yet';
+      el.style.color = 'var(--yellow)';
+    }
+  })
+  .catch(() => {
+    document.getElementById('driveStatus').textContent = '? unknown';
+  });
+</script>
+{% endblock %}
