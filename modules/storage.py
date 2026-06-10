@@ -32,7 +32,7 @@ DEFAULT_PROJECT = {
     "currency": None,        # inherits global if None
     "categories": [],
     "payment_modes": ["Cash", "Gpay", "Bank Transfer", "UPI", "Cheque"],
-    "tags": ["materials", "labour", "advance", "tools", "transport", "miscellaneous"],
+    "tags": ["materials", "labour", "advance", "food", "transport", "miscellaneous"],
     "next_id": 1,
     "expenses": []
 }
