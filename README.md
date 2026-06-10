@@ -22,7 +22,7 @@ Built for personal use — no cloud service, no subscriptions, no ads. Your data
 ## Project structure
 
 ```
-siteLedger/
+Ledger/
 ├── app.py                  ← Flask web server (run this)
 ├── cli.py                  ← Menu-driven terminal CLI
 ├── requirements.txt        ← Python dependencies
@@ -68,8 +68,8 @@ python --version
 
 **Step 1 — Clone the repo**
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/Ra-Helios/Leadger.git
+cd Leadger
 ```
 
 **Step 2 — Create a virtual environment (recommended)**
@@ -100,8 +100,8 @@ python cli.py
 
 **Step 1 — Clone the repo**
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/Ra-Helios/Leadger.git
+cd Leadger
 ```
 
 **Step 2 — Create a virtual environment**
@@ -132,8 +132,8 @@ python cli.py
 
 **Step 1 — Clone the repo**
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/Ra-Helios/Leadger.git
+cd Leadger
 ```
 
 **Step 2 — Create a virtual environment**
@@ -179,8 +179,8 @@ pkg install python git
 
 **Step 3 — Clone the repo**
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/Ra-Helios/Leadger.git
+cd Leadger
 ```
 
 **Step 4 — Install Python dependencies**
@@ -215,6 +215,8 @@ python cli.py
 **Step 7 — First time Drive login on Termux**
 
 The OAuth flow needs a browser. On Termux it will print a URL — copy it, open it in your phone browser, log in, and paste the code back. Or just copy `token.json` from a machine where you have already logged in (this skips the browser step entirely).
+
+> For a complete first-time setup detailed walkthrough, see [DRIVE_SETUP.md](DRIVE_SETUP.md).
 
 > **Termux tip:** The CLI is designed for mobile keyboard use — all navigation is single key presses or numbers, nothing requires a mouse.
 
