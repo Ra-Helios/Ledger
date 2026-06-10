@@ -19,6 +19,16 @@ Built for personal use — no cloud service, no subscriptions, no ads. Your data
 
 ---
 
+## Screenshots
+
+![Screenshot_1](/assets/scrsht1.png)
+
+![Screenshot_2](/assets/scrsht2.png)
+
+![Screenshot_3](/assets/scrsht3.png)
+
+---
+
 ## Project structure
 
 ```
@@ -68,8 +78,8 @@ python --version
 
 **Step 1 — Clone the repo**
 ```bash
-git clone https://github.com/Ra-Helios/Leadger.git
-cd Leadger
+git clone https://github.com/Ra-Helios/Ledger.git
+cd Ledger
 ```
 
 **Step 2 — Create a virtual environment (recommended)**
@@ -100,8 +110,8 @@ python cli.py
 
 **Step 1 — Clone the repo**
 ```bash
-git clone https://github.com/Ra-Helios/Leadger.git
-cd Leadger
+git clone https://github.com/Ra-Helios/Ledger.git
+cd Ledger
 ```
 
 **Step 2 — Create a virtual environment**
@@ -132,8 +142,8 @@ python cli.py
 
 **Step 1 — Clone the repo**
 ```bash
-git clone https://github.com/Ra-Helios/Leadger.git
-cd Leadger
+git clone https://github.com/Ra-Helios/Ledger.git
+cd Ledger
 ```
 
 **Step 2 — Create a virtual environment**
@@ -179,8 +189,8 @@ pkg install python git
 
 **Step 3 — Clone the repo**
 ```bash
-git clone https://github.com/Ra-Helios/Leadger.git
-cd Leadger
+git clone https://github.com/Ra-Helios/Ledger.git
+cd Ledger
 ```
 
 **Step 4 — Install Python dependencies**
