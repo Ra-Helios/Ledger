@@ -13,10 +13,50 @@ app = Flask(__name__)
 app.secret_key = 'multi-ledger-2026-secret'
 
 
+# ── Drive auto-sync helpers ───────────────────────────────────
+
+def _drive_available():
+    """True if credentials.json exists — Drive is configured."""
+    try:
+        from modules.drive_sync import check_credentials_exist
+        return check_credentials_exist()
+    except Exception:
+        return False
+
+def _auto_push(slug):
+    """Push a single project to Drive silently after a write operation."""
+    if not _drive_available():
+        return
+    try:
+        from modules.drive_sync import push_to_drive
+        proj_data = load_project(slug)
+        push_to_drive(slug, proj_data)   # conflicts won't block — local just won
+    except Exception:
+        pass  # silent — local write succeeded, Drive push is best-effort
+
+def _auto_pull_all():
+    """Pull all projects from Drive on server start."""
+    if not _drive_available():
+        return
+    try:
+        from modules.drive_sync import pull_from_drive
+        for p in list_projects():
+            pull_from_drive(p['slug'])
+    except Exception:
+        pass  # silent — if Drive is unavailable, local data is used
+
+
 # ── Context helpers ───────────────────────────────────────────
+
+# Pull all projects from Drive once when server starts
+_startup_pull_done = False
 
 @app.before_request
 def load_globals():
+    global _startup_pull_done
+    if not _startup_pull_done:
+        _startup_pull_done = True
+        _auto_pull_all()
     g.meta      = load_meta()
     g.projects  = list_projects()
     slug = session.get('active_project') or g.meta.get('active_project')
@@ -102,6 +142,7 @@ def add():
             date=request.form['date'],
             notes=request.form.get('notes',''),
         )
+        _auto_push(g.active_slug)
         flash('Expense added!', 'success')
         return redirect(url_for('expenses'))
     return render_template('add_expense.html', proj=g.active_proj,
@@ -129,6 +170,7 @@ def edit(eid):
                        tags=request.form.getlist('tags'),
                        date=request.form['date'],
                        notes=request.form.get('notes',''))
+        _auto_push(g.active_slug)
         flash('Expense updated!', 'success')
         return redirect(url_for('expenses'))
     return render_template('add_expense.html', proj=g.active_proj,
@@ -142,6 +184,7 @@ def edit(eid):
 def delete(eid):
     if g.active_slug:
         delete_expense(g.active_slug, eid)
+        _auto_push(g.active_slug)
         flash('Expense deleted.', 'success')
     return redirect(url_for('expenses'))
 
@@ -203,6 +246,7 @@ def project_settings():
                 p['name'] = proj['name']
                 p['icon'] = proj['icon']
         save_meta(meta)
+        _auto_push(g.active_slug)
         flash('Project settings saved!', 'success')
         return redirect(url_for('dashboard'))
     return render_template('project_settings.html', proj=g.active_proj,

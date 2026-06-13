@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart';
-import 'package:http/http.dart' as http;
 import '../models/models.dart';
 
-const _scopes = [drive.DriveApi.driveReadonlyScope];
+// Editor scope — needed for push
+const _scopes = [drive.DriveApi.driveFileScope];
 const _folderName = 'LedgerJsons';
 
 class DriveService {
@@ -16,59 +16,86 @@ class DriveService {
   DriveService._();
 
   drive.DriveApi? _api;
+  String? _folderId;
 
   // ── Auth ─────────────────────────────────────────────────
 
   Future<drive.DriveApi> _getApi() async {
     if (_api != null) return _api!;
-
-    final keyJson = await rootBundle.loadString('assets/service_account.json');
+    final keyJson =
+        await rootBundle.loadString('assets/service_account.json');
     final keyData = jsonDecode(keyJson) as Map<String, dynamic>;
-
     final credentials = ServiceAccountCredentials.fromJson(keyData);
     final client = await clientViaServiceAccount(credentials, _scopes);
     _api = drive.DriveApi(client);
     return _api!;
   }
 
-  // ── Find LedgerJsons folder ───────────────────────────────
+  // ── Folder ────────────────────────────────────────────────
 
-  Future<String?> _getFolderId(drive.DriveApi api) async {
+  Future<String> _getFolderId(drive.DriveApi api) async {
+    if (_folderId != null) return _folderId!;
     final result = await api.files.list(
       q: "name='$_folderName' and mimeType='application/vnd.google-apps.folder' and trashed=false",
       $fields: 'files(id,name)',
     );
     final files = result.files;
-    if (files == null || files.isEmpty) return null;
-    return files.first.id;
+    if (files != null && files.isNotEmpty) {
+      _folderId = files.first.id!;
+      return _folderId!;
+    }
+    // Create it
+    final meta = drive.File()
+      ..name = _folderName
+      ..mimeType = 'application/vnd.google-apps.folder';
+    final created = await api.files.create(meta, $fields: 'id');
+    _folderId = created.id!;
+    return _folderId!;
   }
 
-  // ── List all .json files in the folder ───────────────────
-
-  Future<List<drive.File>> _listProjectFiles(drive.DriveApi api, String folderId) async {
+  Future<String?> _findFile(
+      drive.DriveApi api, String folderId, String filename) async {
     final result = await api.files.list(
-      q: "'$folderId' in parents and trashed=false and mimeType='application/json'",
-      $fields: 'files(id,name,modifiedTime)',
-      orderBy: 'name',
+      q: "'$folderId' in parents and name='$filename' and trashed=false",
+      $fields: 'files(id,name)',
     );
-    return result.files ?? [];
+    final files = result.files;
+    return (files != null && files.isNotEmpty) ? files.first.id : null;
   }
 
-  // ── Download a single file ────────────────────────────────
+  // ── Download ──────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> _downloadJson(drive.DriveApi api, String fileId) async {
+  Future<Map<String, dynamic>> _downloadJson(
+      drive.DriveApi api, String fileId) async {
     final media = await api.files.get(
       fileId,
       downloadOptions: drive.DownloadOptions.fullMedia,
     ) as drive.Media;
-
     final chunks = <int>[];
     await for (final chunk in media.stream) {
       chunks.addAll(chunk);
     }
+    return jsonDecode(utf8.decode(chunks)) as Map<String, dynamic>;
+  }
 
-    final jsonStr = utf8.decode(chunks); // explicit utf-8 — handles emojis safely
-    return jsonDecode(jsonStr) as Map<String, dynamic>;
+  // ── Upload ────────────────────────────────────────────────
+
+  Future<void> _uploadJson(drive.DriveApi api, String folderId,
+      String filename, Map<String, dynamic> data,
+      {String? existingId}) async {
+    final bytes = utf8.encode(jsonEncode(data));
+    final stream = Stream.fromIterable([bytes]);
+    final media = drive.Media(stream, bytes.length,
+        contentType: 'application/json');
+    if (existingId != null) {
+      await api.files.update(drive.File(), existingId,
+          uploadMedia: media, $fields: 'id');
+    } else {
+      final meta = drive.File()
+        ..name = filename
+        ..parents = [folderId];
+      await api.files.create(meta, uploadMedia: media, $fields: 'id');
+    }
   }
 
   // ── Public: fetch all projects ────────────────────────────
@@ -76,38 +103,37 @@ class DriveService {
   Future<List<Project>> fetchAllProjects() async {
     final api = await _getApi();
     final folderId = await _getFolderId(api);
-
-    if (folderId == null) {
-      throw Exception(
-        'LedgerJsons folder not found on Drive.\n'
-        'Make sure you have shared it with the service account.',
-      );
-    }
-
-    final files = await _listProjectFiles(api, folderId);
-
-    if (files.isEmpty) {
-      return [];
-    }
-
+    final result = await api.files.list(
+      q: "'$folderId' in parents and trashed=false and mimeType='application/json'",
+      $fields: 'files(id,name,modifiedTime)',
+      orderBy: 'name',
+    );
+    final files = result.files ?? [];
     final projects = <Project>[];
     for (final file in files) {
       try {
         final data = await _downloadJson(api, file.id!);
-        // derive slug from filename (strip .json)
         final slug = (file.name ?? 'unknown').replaceAll('.json', '');
         projects.add(Project.fromJson(slug, data));
-      } catch (e) {
-        // skip malformed files silently
-      }
+      } catch (_) {}
     }
-
-    // Sort by created date
     projects.sort((a, b) => a.created.compareTo(b.created));
     return projects;
   }
 
-  // ── Reset cached API (force re-auth if needed) ────────────
+  // ── Public: push one project ──────────────────────────────
 
-  void reset() => _api = null;
+  Future<void> pushProject(Project project) async {
+    final api      = await _getApi();
+    final folderId = await _getFolderId(api);
+    final filename = '${project.slug}.json';
+    final existing = await _findFile(api, folderId, filename);
+    await _uploadJson(api, folderId, filename, project.toJson(),
+        existingId: existing);
+  }
+
+  void reset() {
+    _api = null;
+    _folderId = null;
+  }
 }

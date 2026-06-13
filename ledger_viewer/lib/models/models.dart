@@ -1,17 +1,17 @@
 // lib/models/models.dart
 
 class Project {
-  final String slug;
-  final String name;
-  final String icon;
-  final String description;
-  final String created;
-  final String currency;
-  final List<String> categories;
-  final List<String> paymentModes;
-  final List<String> tags;
-  final int nextId;
-  final List<Expense> expenses;
+  String slug;
+  String name;
+  String icon;
+  String description;
+  String created;
+  String? currency;
+  List<String> categories;
+  List<String> paymentModes;
+  List<String> tags;
+  int nextId;
+  List<Expense> expenses;
 
   Project({
     required this.slug,
@@ -19,7 +19,7 @@ class Project {
     required this.icon,
     required this.description,
     required this.created,
-    required this.currency,
+    this.currency,
     required this.categories,
     required this.paymentModes,
     required this.tags,
@@ -34,7 +34,7 @@ class Project {
       icon: json['icon'] ?? '📁',
       description: json['description'] ?? '',
       created: json['created'] ?? '',
-      currency: json['currency'] ?? '₹',
+      currency: json['currency'],
       categories: List<String>.from(json['categories'] ?? []),
       paymentModes: List<String>.from(json['payment_modes'] ?? []),
       tags: List<String>.from(json['tags'] ?? []),
@@ -45,90 +45,131 @@ class Project {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'icon': icon,
+    'description': description,
+    'created': created,
+    'currency': currency,
+    'categories': categories,
+    'payment_modes': paymentModes,
+    'tags': tags,
+    'next_id': nextId,
+    'expenses': expenses.map((e) => e.toJson()).toList(),
+  };
+
+  String get effectiveCurrency => currency ?? '₹';
+
+  // ── CRUD ───────────────────────────────────────────────
+
+  Expense addExpense({
+    required String category,
+    required String vendor,
+    required double amount,
+    required String mode,
+    required String description,
+    required List<String> tags,
+    required String date,
+    String notes = '',
+  }) {
+    final e = Expense(
+      id: nextId,
+      category: category,
+      vendor: vendor,
+      amount: amount,
+      mode: mode,
+      description: description,
+      tags: List<String>.from(tags),
+      date: date,
+      notes: notes,
+    );
+    nextId++;
+    expenses.add(e);
+    return e;
+  }
+
+  void updateExpense(Expense updated) {
+    final idx = expenses.indexWhere((e) => e.id == updated.id);
+    if (idx != -1) expenses[idx] = updated;
+  }
+
+  void deleteExpense(int id) {
+    expenses.removeWhere((e) => e.id == id);
+  }
+
+  Expense? getById(int id) {
+    try {
+      return expenses.firstWhere((e) => e.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<Expense> get sortedByDateDesc {
+    final copy = List<Expense>.from(expenses);
+    copy.sort((a, b) => b.date.compareTo(a.date));
+    return copy;
+  }
+
   // ── Analytics ──────────────────────────────────────────
 
   double get total => expenses.fold(0, (s, e) => s + e.amount);
-  double get cashTotal => expenses.where((e) => e.mode == 'Cash').fold(0, (s, e) => s + e.amount);
+  double get cashTotal =>
+      expenses.where((e) => e.mode == 'Cash').fold(0, (s, e) => s + e.amount);
   double get digitalTotal => total - cashTotal;
   double get avg => expenses.isEmpty ? 0 : total / expenses.length;
 
   Map<String, double> get categoryBreakdown {
     final m = <String, double>{};
-    for (final e in expenses) {
-      m[e.category] = (m[e.category] ?? 0) + e.amount;
-    }
+    for (final e in expenses) m[e.category] = (m[e.category] ?? 0) + e.amount;
     final sorted = Map.fromEntries(
-      m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)),
-    );
+        m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
     return sorted;
   }
 
   Map<String, double> get vendorBreakdown {
     final m = <String, double>{};
-    for (final e in expenses) {
-      m[e.vendor] = (m[e.vendor] ?? 0) + e.amount;
-    }
+    for (final e in expenses) m[e.vendor] = (m[e.vendor] ?? 0) + e.amount;
     final sorted = Map.fromEntries(
-      m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)),
-    );
+        m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
     return sorted;
   }
 
   Map<String, double> get modeBreakdown {
     final m = <String, double>{};
-    for (final e in expenses) {
-      m[e.mode] = (m[e.mode] ?? 0) + e.amount;
-    }
+    for (final e in expenses) m[e.mode] = (m[e.mode] ?? 0) + e.amount;
     return m;
   }
 
   Map<String, double> get tagBreakdown {
     final m = <String, double>{};
     for (final e in expenses) {
-      for (final t in e.tags) {
-        m[t] = (m[t] ?? 0) + e.amount;
-      }
+      for (final t in e.tags) m[t] = (m[t] ?? 0) + e.amount;
     }
     final sorted = Map.fromEntries(
-      m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)),
-    );
+        m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
     return sorted;
   }
 
   Map<String, double> get dailyBreakdown {
     final m = <String, double>{};
-    for (final e in expenses) {
-      m[e.date] = (m[e.date] ?? 0) + e.amount;
-    }
+    for (final e in expenses) m[e.date] = (m[e.date] ?? 0) + e.amount;
     final sorted = Map.fromEntries(
-      m.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
-    );
-    return sorted;
-  }
-
-  Map<String, double> get monthlyBreakdown {
-    final m = <String, double>{};
-    for (final e in expenses) {
-      final month = e.date.length >= 7 ? e.date.substring(0, 7) : e.date;
-      m[month] = (m[month] ?? 0) + e.amount;
-    }
-    final sorted = Map.fromEntries(
-      m.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
-    );
+        m.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
     return sorted;
   }
 }
 
 class Expense {
   final int id;
-  final String category;
-  final String vendor;
-  final double amount;
-  final String mode;
-  final String description;
-  final List<String> tags;
-  final String date;
-  final String notes;
+  String category;
+  String vendor;
+  double amount;
+  String mode;
+  String description;
+  List<String> tags;
+  String date;
+  String notes;
 
   Expense({
     required this.id,
@@ -142,17 +183,49 @@ class Expense {
     required this.notes,
   });
 
-  factory Expense.fromJson(Map<String, dynamic> json) {
-    return Expense(
-      id: json['id'] ?? 0,
-      category: json['category'] ?? '',
-      vendor: json['vendor'] ?? '',
-      amount: (json['amount'] ?? 0).toDouble(),
-      mode: json['mode'] ?? '',
-      description: json['description'] ?? '',
-      tags: List<String>.from(json['tags'] ?? []),
-      date: json['date'] ?? '',
-      notes: json['notes'] ?? '',
-    );
-  }
+  factory Expense.fromJson(Map<String, dynamic> json) => Expense(
+        id: json['id'] ?? 0,
+        category: json['category'] ?? '',
+        vendor: json['vendor'] ?? '',
+        amount: (json['amount'] ?? 0).toDouble(),
+        mode: json['mode'] ?? '',
+        description: json['description'] ?? '',
+        tags: List<String>.from(json['tags'] ?? []),
+        date: json['date'] ?? '',
+        notes: json['notes'] ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'category': category,
+        'vendor': vendor,
+        'amount': amount,
+        'mode': mode,
+        'description': description,
+        'tags': tags,
+        'date': date,
+        'notes': notes,
+      };
+
+  Expense copyWith({
+    String? category,
+    String? vendor,
+    double? amount,
+    String? mode,
+    String? description,
+    List<String>? tags,
+    String? date,
+    String? notes,
+  }) =>
+      Expense(
+        id: id,
+        category: category ?? this.category,
+        vendor: vendor ?? this.vendor,
+        amount: amount ?? this.amount,
+        mode: mode ?? this.mode,
+        description: description ?? this.description,
+        tags: tags ?? this.tags,
+        date: date ?? this.date,
+        notes: notes ?? this.notes,
+      );
 }
