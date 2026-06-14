@@ -16,11 +16,11 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
-  String _search = '';
-  String _filterCat = '';
+  String _search   = '';
+  String _filterCat  = '';
   String _filterMode = '';
-  String _filterTag = '';
-  String _sort = 'date_desc';
+  String _filterTag  = '';
+  String _sort     = 'date_desc';
   final _searchCtrl = TextEditingController();
 
   @override
@@ -88,31 +88,57 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   Navigator.pop(ctx);
                 },
                 child: const Text('Clear all',
-                    style: TextStyle(
-                        color: AppTheme.accent, fontSize: 12)),
+                    style: TextStyle(color: AppTheme.accent, fontSize: 12)),
               ),
             ]),
             const SizedBox(height: 12),
-            _filterDrop('Category', _filterCat,
-                ['', ...project.categories],
-                (v) { setState(() => _filterCat = v!); setModal(() {}); }),
+            _filterDrop(
+              title: 'Category',
+              value: _filterCat,
+              items: ['', ...project.categories],
+              onChanged: (v) {
+                setState(() => _filterCat = v ?? '');
+                setModal(() {});
+              },
+            ),
             const SizedBox(height: 8),
-            _filterDrop('Mode', _filterMode,
-                ['', ...project.paymentModes],
-                (v) { setState(() => _filterMode = v!); setModal(() {}); }),
+            _filterDrop(
+              title: 'Mode',
+              value: _filterMode,
+              items: ['', ...project.paymentModes],
+              onChanged: (v) {
+                setState(() => _filterMode = v ?? '');
+                setModal(() {});
+              },
+            ),
             const SizedBox(height: 8),
-            _filterDrop('Tag', _filterTag,
-                ['', ...project.tags],
-                (v) { setState(() => _filterTag = v!); setModal(() {}); }),
+            _filterDrop(
+              title: 'Tag',
+              value: _filterTag,
+              items: ['', ...project.tags],
+              onChanged: (v) {
+                setState(() => _filterTag = v ?? '');
+                setModal(() {});
+              },
+            ),
             const SizedBox(height: 8),
-            _filterDrop('Sort', _sort,
-                ['date_desc','date_asc','amount_desc','amount_asc','id_desc','id_asc'],
-                (v) { setState(() => _sort = v!); setModal(() {}); },
-                label: (v) => {
-                  'date_desc': 'Date ↓', 'date_asc': 'Date ↑',
-                  'amount_desc': 'Amount ↓', 'amount_asc': 'Amount ↑',
-                  'id_desc': 'Entry # ↓', 'id_asc': 'Entry # ↑',
-                }[v]!),
+            _filterDrop(
+              title: 'Sort',
+              value: _sort,
+              items: ['date_desc','date_asc','amount_desc','amount_asc','id_desc','id_asc'],
+              onChanged: (v) {
+                setState(() => _sort = v ?? 'date_desc');
+                setModal(() {});
+              },
+              displayLabel: (v) => {
+                'date_desc':   'Date ↓',
+                'date_asc':    'Date ↑',
+                'amount_desc': 'Amount ↓',
+                'amount_asc':  'Amount ↑',
+                'id_desc':     'Entry # ↓',
+                'id_asc':      'Entry # ↑',
+              }[v] ?? v,
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -127,36 +153,46 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _filterDrop(String label, String value, List<String> items,
-      ValueChanged<String?> onChanged, {String Function(String)? label_fn}) =>
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(
-          fontSize: 10, color: AppTheme.text3,
-          fontWeight: FontWeight.w700, letterSpacing: 1)),
-      const SizedBox(height: 4),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppTheme.surface2,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.border),
+  // Fixed: renamed label param to displayLabel to avoid conflict with
+  // Dart's built-in 'label' identifier
+  Widget _filterDrop({
+    required String title,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    String Function(String)? displayLabel,
+  }) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: const TextStyle(
+                fontSize: 10, color: AppTheme.text3,
+                fontWeight: FontWeight.w700, letterSpacing: 1)),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.surface2,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            dropdownColor: AppTheme.surface2,
+            underline: const SizedBox(),
+            style: const TextStyle(color: AppTheme.text, fontSize: 13),
+            items: items.map((v) => DropdownMenuItem(
+              value: v,
+              child: Text(
+                displayLabel != null
+                    ? displayLabel(v)
+                    : (v.isEmpty ? 'All' : v),
+              ),
+            )).toList(),
+            onChanged: onChanged,
+          ),
         ),
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: AppTheme.surface2,
-          underline: const SizedBox(),
-          style: const TextStyle(color: AppTheme.text, fontSize: 13),
-          items: items.map((v) => DropdownMenuItem(
-            value: v,
-            child: Text(label_fn != null
-                ? label_fn(v)
-                : (v.isEmpty ? 'All' : v)),
-          )).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    ]);
+      ]);
 
   Future<void> _confirmDelete(
       BuildContext context, String slug, Expense e) async {
@@ -180,8 +216,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               child: const Text('Cancel',
                   style: TextStyle(color: AppTheme.text2))),
           FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.red),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -215,8 +250,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 child: TextField(
                   controller: _searchCtrl,
                   onChanged: (v) => setState(() => _search = v),
-                  style: const TextStyle(
-                      color: AppTheme.text, fontSize: 13),
+                  style: const TextStyle(color: AppTheme.text, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: 'Search...',
                     prefixIcon: const Icon(Icons.search_rounded,
@@ -240,8 +274,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 backgroundColor: AppTheme.accent,
                 child: IconButton(
                   onPressed: () => _showFilters(project),
-                  icon: const Icon(Icons.tune_rounded,
-                      color: AppTheme.text2),
+                  icon: const Icon(Icons.tune_rounded, color: AppTheme.text2),
                 ),
               ),
             ]),
@@ -250,18 +283,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           // Summary strip
           Container(
             color: AppTheme.surface2,
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
             child: Row(children: [
               Text('${filtered.length} entries',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppTheme.text3)),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.text3)),
               const Spacer(),
               Text('$cur${fmt.format(total)}',
                   style: const TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w700,
-                      color: AppTheme.yellow,
-                      fontFamily: 'monospace')),
+                      color: AppTheme.yellow, fontFamily: 'monospace')),
             ]),
           ),
           const Divider(height: 0),
@@ -270,9 +300,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           Expanded(
             child: filtered.isEmpty
                 ? Center(
-                    child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
                       const Icon(Icons.inbox_rounded,
                           size: 40, color: AppTheme.text3),
                       const SizedBox(height: 10),
@@ -281,16 +309,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             ? 'No entries match'
                             : 'No expenses yet',
                         style: const TextStyle(
-                            color: AppTheme.text2,
-                            fontSize: 13),
+                            color: AppTheme.text2, fontSize: 13),
                       ),
                     ]),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.only(bottom: 80),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const Divider(
-                        height: 0, indent: 16, endIndent: 16),
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 0, indent: 16, endIndent: 16),
                     itemBuilder: (_, i) =>
                         _buildTile(context, filtered[i], cur),
                   ),
@@ -313,7 +340,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       ),
       confirmDismiss: (_) async {
         await _confirmDelete(context, widget.slug, e);
-        return false; // we handle deletion ourselves
+        return false;
       },
       child: ListTile(
         contentPadding:
@@ -329,8 +356,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: Text('${e.id}',
                 style: const TextStyle(
                     fontSize: 10, color: AppTheme.text3,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w600)),
+                    fontFamily: 'monospace', fontWeight: FontWeight.w600)),
           ),
         ),
         title: Row(children: [
@@ -350,12 +376,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             children: [
           const SizedBox(height: 2),
           Text(e.description,
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.text2)),
+              style: const TextStyle(fontSize: 12, color: AppTheme.text2)),
           if (e.notes.isNotEmpty)
             Text('📝 ${e.notes}',
-                style: const TextStyle(
-                    fontSize: 10, color: AppTheme.text3)),
+                style:
+                    const TextStyle(fontSize: 10, color: AppTheme.text3)),
           const SizedBox(height: 4),
           Row(children: [
             Text(e.date,

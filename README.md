@@ -1,6 +1,6 @@
 # 📒 Ledger — Personal Multi-Project Expense Tracker
 
-A personal expense tracking app with a **Flask web UI**, a **menu-driven CLI**, a **read-only Flutter mobile app**, and **Google Drive sync** to keep your data in sync across multiple devices.
+A personal expense tracking app with a **Flask web UI**, a **menu-driven CLI**, a **Flutter mobile app**, and **Google Drive sync** to keep your data in sync across multiple devices.
 
 Built for personal use — no cloud service, no subscriptions, no ads. Your data lives as plain JSON files on your own machine and optionally on your own Google Drive.
 
@@ -10,12 +10,12 @@ Built for personal use — no cloud service, no subscriptions, no ads. Your data
 
 - Track expenses across multiple independent projects (home renovation, college fees, business, travel — anything)
 - Each project has its own categories, payment modes, and tags
-- Add, edit, delete expenses through a web GUI or the CLI
+- Add, edit, delete expenses through a web GUI, the CLI, or the Flutter mobile app
 - View analytics — category breakdown, vendor breakdown, payment mode split, tag breakdown, daily timeline
 - Export any project to a formatted Excel file with charts
-- Sync your JSON data to Google Drive and fetch it on another machine
+- Auto-sync to Google Drive — web app pulls on startup and pushes after every change, Flutter app fetches on open and pushes after every change
 - Use the CLI fully from a terminal, including on Android via Termux
-- View all data read-only on Android via a Flutter app that reads directly from Drive
+- Manage expenses on Android via a Flutter app that reads and writes directly to Drive
 
 ---
 
@@ -51,7 +51,7 @@ Ledger/
 │   ├── exporter.py         ← Excel export logic
 │   └── drive_sync.py       ← Google Drive push/pull
 ├── templates/              ← Jinja2 HTML templates for Flask
-└── ledger_viewer/          ← Flutter mobile app (read-only viewer)
+└── ledger_viewer/          ← Flutter mobile app
     ├── lib/
     ├── assets/
     │   └── service_account.json  ← YOUR Drive service account key (add manually)
@@ -200,6 +200,8 @@ pip install flask rich google-auth google-auth-oauthlib google-auth-httplib2 goo
 
 > `openpyxl` is only needed for Excel export which the CLI does not support, so you can skip it on Termux. If you want it anyway: `pip install openpyxl`
 
+> If `cryptography` fails to build, try: `pkg install python-cryptography` first, then run the pip install above.
+
 **Step 5 — Copy your security files manually**
 
 These files are not in the repo for security reasons. Copy them to the project folder on your phone:
@@ -234,79 +236,33 @@ The OAuth flow needs a browser. On Termux it will print a URL — copy it, open 
 
 ## Part 2 — Google Drive sync setup
 
-This lets you save your project JSONs to your personal Google Drive and fetch them on any other machine. Completely optional — the app works fine without it.
+This lets you save your project JSONs to your personal Google Drive and keep all devices in sync automatically. Completely optional — the app works fine without it.
 
-### Step 1 — Create a Google Cloud project
+> For a detailed step-by-step Drive setup guide, see [DRIVE_SETUP.md](DRIVE_SETUP.md).
 
-1. Go to https://console.cloud.google.com/
-2. Click the project dropdown at the top → **New Project**
-3. Name it anything, e.g. `ledger-backup` → **Create**
-4. Make sure this new project is selected in the dropdown
+### How auto-sync works
 
-### Step 2 — Enable the Google Drive API
+**Web app** — on the first page request after `python app.py` starts, all projects are pulled from Drive automatically. After every add, edit, delete, or project settings save, the updated project is pushed to Drive silently in the background.
 
-1. In the left sidebar → **APIs & Services → Library**
-2. Search for `Google Drive API`
-3. Click it → **Enable**
+**Flutter app** — fetches all projects from Drive automatically when the app opens. After every add, edit, delete, or settings change, pushes to Drive automatically. A small spinner in the title bar shows when a push is in progress.
 
-### Step 3 — Configure the OAuth consent screen
+Manual **Save to Drive** and **Fetch from Drive** buttons remain available in Project Settings for on-demand sync.
 
-1. Left sidebar → **APIs & Services → OAuth consent screen**
-   (This may now appear under **Google Auth Platform**)
-2. User type: **External** → **Create**
-3. Fill in:
-   - App name: `Ledger` (or anything)
-   - User support email: your Gmail
-   - Developer contact email: your Gmail
-4. Click **Save and Continue** through all steps (scopes and test users can be done after)
-5. Back on the OAuth consent screen, scroll to **Test users**
-6. Click **+ Add Users** → add your Gmail address → **Save**
+### Conflict detection
 
-> This step is required. Without adding yourself as a test user, Google will block the login with "Access blocked" error.
+When two devices both make changes without syncing in between, the app compares the exact set of entry IDs on each side and detects a diverge — showing you exactly which entries exist on each side and refusing to silently overwrite either copy.
 
-### Step 4 — Create OAuth credentials
+> See [DRIVE_SETUP.md](DRIVE_SETUP.md) for full conflict detection details and how to resolve a diverge manually.
 
-1. Left sidebar → **APIs & Services → Credentials**
-   (or **Google Auth Platform → Clients**)
-2. **+ Create Credentials → OAuth 2.0 Client ID**
-3. Application type: **Desktop app**
-4. Name: anything, e.g. `LedgerDesktop`
-5. **Create**
-6. Click **Download JSON** on the popup (or download icon next to the client)
-7. Rename the downloaded file to exactly `credentials.json`
-8. Place it in your project root folder (same folder as `app.py`)
+### Security note
 
-### Step 5 — First login
-
-Start the web app (`python app.py`) and go to **Project Settings** for any project. You will see the Google Drive Sync section. Click **Save to Drive**.
-
-A browser tab opens → log in with the Google account you added as a test user → allow access → done.
-
-A `token.json` file is automatically saved. All future syncs are silent — no login needed again on this machine.
-
-### Step 6 — Second machine setup
-
-On the second machine:
-1. Pull the repo
-2. Place `credentials.json` in the project root (same file, copy it across)
-3. Either click Save/Fetch from Drive to do the browser login once, or copy `token.json` from the first machine to skip it entirely
-
-### How sync works
-
-- **Save to Drive** — pushes your local project JSON to `My Drive → LedgerJsons → <project>.json`
-- **Fetch from Drive** — pulls the Drive JSON down to local
-- **Conflict detection** — uses `next_id` (a counter that only ever increases) to detect which copy is newer:
-  - Local newer → safe to push
-  - Drive newer → safe to pull
-  - Conflict → shows both sides, you decide
-
-> **Security note:** Never commit `credentials.json` or `token.json` to a public repo. They are listed in `.gitignore` already.
+Never commit `credentials.json`, `token.json`, or the Flutter `service_account.json` to a public repo. All three are listed in `.gitignore` already.
 
 ---
 
-## Part 3 — Flutter mobile app (read-only viewer)
+## Part 3 — Flutter mobile app
 
-The Flutter app connects directly to your Google Drive using a service account and shows all your projects and expenses. It is strictly read-only — no add, edit, or delete.
+The Flutter app connects directly to your Google Drive using a service account. It supports full expense management — add, edit, delete, and project settings — and syncs automatically with Drive on open and after every change.
 
 ### Prerequisites
 
@@ -322,7 +278,7 @@ All required items (Flutter, Android toolchain, Android Studio) should show ✓.
 
 ### Step 1 — Create a service account on Google Cloud
 
-A service account is a bot credential that lets the Flutter app read your Drive silently — no login screen ever appears on the phone.
+A service account is a bot credential — no login screen ever appears on the phone.
 
 1. Go to https://console.cloud.google.com/ → select your `ledger-backup` project
 2. Left sidebar → **IAM & Admin → Service Accounts**
@@ -341,9 +297,11 @@ A service account is a bot credential that lets the Flutter app read your Drive 
 3. Go to **Google Drive** in your browser
 4. Find the `LedgerJsons` folder (created automatically when you first used Save to Drive)
 5. Right-click → **Share**
-6. Paste the service account email → set permission to **Viewer** → **Share**
+6. Paste the service account email → set permission to **Editor** → **Share**
 
-> If `LedgerJsons` doesn't exist yet, run Save to Drive from the web app first to create it.
+> **Editor permission is required** — the app supports adding, editing, and deleting expenses so it needs write access to Drive.
+
+> If `LedgerJsons` doesn't exist yet, start the web app, add any expense, and it will be created automatically.
 
 ### Step 3 — Set up the Flutter project
 
@@ -354,7 +312,7 @@ cd ledger_viewer
 
 **Replace the placeholder service account file:**
 
-Open `assets/service_account.json` and replace its entire contents with your real service account key JSON that you downloaded in Step 1.
+Open `assets/service_account.json` and replace its entire contents with your real service account key JSON downloaded in Step 1.
 
 **Install Flutter dependencies:**
 ```bash
@@ -391,11 +349,11 @@ ledger_viewer/build/app/outputs/flutter-apk/app-release.apk
 
 ### Flutter app features
 
-- **Home screen** — lists all projects from Drive with combined total, auto-fetches on open
-- **Pull to refresh** — swipe down anywhere to re-fetch from Drive
-- **Analytics tab** — 4 stat cards (total, average, cash, digital), category doughnut chart, category progress bars, payment mode cards, vendor list, tag breakdown, daily line chart
-- **Expenses tab** — full list with search bar and filter sheet (category, mode, tag, sort by date / amount / entry ID)
-- **View only** — no add, edit, or delete anywhere in the app
+- **Home screen** — lists all projects from Drive with combined total, auto-fetches on open, pull-to-refresh
+- **Dashboard tab** — 4 stat cards (total, average, cash, digital), category doughnut chart, category progress bars, payment mode cards, vendor list, tag breakdown, daily line chart
+- **Expenses tab** — full list with search bar and filter sheet (category, mode, tag, sort by date / amount / entry ID), tap to edit, swipe left or long press to delete, ＋ button to add
+- **Settings tab** — edit project name, icon, description, currency, add/remove/rename categories, payment modes, and tags
+- **Auto-sync** — fetches from Drive on open, pushes to Drive after every change automatically
 
 ---
 
@@ -489,7 +447,7 @@ Push local data to Drive or pull from Drive. Shows conflict details if detected 
 - `token.json` — your saved login session. Never commit to any repo.
 - `assets/service_account.json` (Flutter) — your Drive service account key. Never commit the real version.
 - `data/` — your expense data. Keep off public repos — it is personal financial information.
-- All three are listed in `.gitignore` and will not be pushed automatically.
+- All are listed in `.gitignore` and will not be pushed automatically.
 
 ---
 
@@ -510,8 +468,17 @@ Update to the latest `widgets.dart` — this rendering bug has been fixed.
 **Flutter APK build: Kotlin version warnings**
 These are warnings, not errors. The APK will still build and run correctly. They come from Gradle dependencies and do not affect functionality.
 
+**Flutter app cannot write to Drive**
+Make sure the service account has **Editor** permission on the `LedgerJsons` folder, not just Viewer. Right-click the folder in Drive → Share → find the service account email → change to Editor.
+
 **Termux: Drive login browser does not open**
 The OAuth flow will print a URL to the terminal. Copy it manually, open it in your phone browser, complete the login, and paste the resulting code back in the terminal. Alternatively copy `token.json` from a machine that is already logged in.
 
+**Termux: cryptography package fails to install**
+Run `pkg install python-cryptography` first, then retry `pip install -r requirements.txt`.
+
 **"next_id not incrementing" (entries getting duplicate IDs)**
 Update to the latest `expense.py` — this was a double-save race condition bug that has been fixed.
+
+**Diverge warning appears unexpectedly**
+Both devices made changes without syncing in between. See [DRIVE_SETUP.md](DRIVE_SETUP.md) for how to resolve a diverge manually.
