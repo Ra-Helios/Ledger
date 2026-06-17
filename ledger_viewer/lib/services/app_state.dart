@@ -38,7 +38,12 @@ class AppState extends ChangeNotifier {
       lastFetched = DateTime.now();
       error = null;
     } catch (e) {
-      error = e.toString();
+      final msg = e.toString();
+      if (msg.contains('not_signed_in')) {
+        error = 'Not signed in. Please sign in again.';
+      } else {
+        error = msg;
+      }
     } finally {
       loading = false;
       notifyListeners();
@@ -119,5 +124,15 @@ class AppState extends ChangeNotifier {
     if (tags != null)         project.tags = tags;
     notifyListeners();
     await _push(project);
+  }
+
+  /// Reset state on sign-out
+  void reset() {
+    _projects = [];
+    loading = false;
+    pushing = false;
+    error = null;
+    lastFetched = null;
+    notifyListeners();
   }
 }

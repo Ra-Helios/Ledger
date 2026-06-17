@@ -3,8 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme.dart';
-import 'screens/home_screen.dart';
-import 'services/app_state.dart';
+import 'screens/login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,14 +22,11 @@ class LedgerApp extends StatelessWidget {
   const LedgerApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: AppState.instance,
-      builder: (context, _) => MaterialApp(
-        title: 'Ledger',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        home: const HomeScreen(),
-      ),
+    return MaterialApp(
+      title: 'Ledger',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark,
+      home: const LoginScreen(), // starts at login, redirects to home if already signed in
     );
   }
 }

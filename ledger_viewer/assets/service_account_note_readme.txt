@@ -1,2 +1,0 @@
-This is a Placeholder text file for service account's key json file , rename your service account's key as "service_account.json" and drop it in this folder,
-i.e. \assets\service_account.json (Don't forget add your service email account to the drive's folder to access the data from your flutter mobile app).

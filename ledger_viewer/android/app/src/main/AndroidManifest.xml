@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Required for Google Drive API calls -->
+    <!-- Required for Google Drive API calls and Sign-In -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
@@ -33,5 +33,7 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Required for google_sign_in to find the Google Play Services account picker -->
+        <package android:name="com.google.android.gms"/>
     </queries>
 </manifest>

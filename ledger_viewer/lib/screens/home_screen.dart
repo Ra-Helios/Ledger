@@ -3,25 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/app_state.dart';
+import '../services/drive_service.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import 'project_screen.dart';
+import 'login_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Auto-fetch on open
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      AppState.instance.fetchAll();
-    });
-  }
 
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
@@ -30,15 +19,53 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${diff.inHours}h ago';
   }
 
+  Future<void> _signOut(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: AppTheme.border)),
+        title: const Text('Sign Out?',
+            style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Signed in as ${DriveService.instance.userEmail ?? "unknown"}',
+          style: const TextStyle(color: AppTheme.text2, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel',
+                  style: TextStyle(color: AppTheme.text2))),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      await DriveService.instance.signOut();
+      if (context.mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppState.instance,
       builder: (context, _) {
-        final state = AppState.instance;
-        final projects = state.projects;
-        final grandTotal =
-            projects.fold(0.0, (s, p) => s + p.total);
+        final state     = AppState.instance;
+        final projects  = state.projects;
+        final grandTotal = projects.fold(0.0, (s, p) => s + p.total);
 
         return Scaffold(
           backgroundColor: AppTheme.bg,
@@ -60,8 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(
                   width: 12, height: 12,
                   child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: AppTheme.accent),
+                      strokeWidth: 1.5, color: AppTheme.accent),
                 ),
               ],
             ]),
@@ -87,20 +113,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     : const Icon(Icons.refresh_rounded),
                 tooltip: 'Refresh from Drive',
               ),
+              IconButton(
+                onPressed: () => _signOut(context),
+                icon: const Icon(Icons.logout_rounded,
+                    size: 20, color: AppTheme.text3),
+                tooltip: 'Sign out',
+              ),
             ],
           ),
           body: RefreshIndicator(
             onRefresh: state.fetchAll,
             color: AppTheme.accent,
             backgroundColor: AppTheme.surface,
-            child: _buildBody(state, projects, grandTotal),
+            child: _buildBody(context, state, projects, grandTotal),
           ),
         );
       },
     );
   }
 
-  Widget _buildBody(AppState state, projects, double grandTotal) {
+  Widget _buildBody(BuildContext context, AppState state,
+      List projects, double grandTotal) {
     if (state.loading && projects.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(16),
@@ -116,8 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (state.error != null && projects.isEmpty) {
-      return ErrorView(
-          message: state.error!, onRetry: state.fetchAll);
+      return ErrorView(message: state.error!, onRetry: state.fetchAll);
     }
 
     return ListView(
@@ -139,17 +171,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   size: 40, color: AppTheme.text3),
               SizedBox(height: 12),
               Text('No projects found on Drive',
-                  style:
-                      TextStyle(color: AppTheme.text2, fontSize: 14)),
+                  style: TextStyle(color: AppTheme.text2, fontSize: 14)),
+              SizedBox(height: 4),
+              Text('Push a project from the web app first',
+                  style: TextStyle(color: AppTheme.text3, fontSize: 11)),
             ]),
           )
         else
-          ...projects.map((p) => _buildProjectCard(p)),
+          ...projects.map((p) => _buildProjectCard(context, p)),
         const SizedBox(height: 16),
+        Center(
+          child: Text(
+            DriveService.instance.userEmail ?? '',
+            style: const TextStyle(fontSize: 10, color: AppTheme.text3),
+          ),
+        ),
+        const SizedBox(height: 4),
         const Center(
           child: Text('Pull down to refresh from Drive',
-              style:
-                  TextStyle(fontSize: 11, color: AppTheme.text3)),
+              style: TextStyle(fontSize: 11, color: AppTheme.text3)),
         ),
         const SizedBox(height: 8),
       ],
@@ -170,9 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     child: Row(children: [
       Expanded(
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('COMBINED TOTAL',
               style: TextStyle(
                   fontSize: 10, color: AppTheme.text3,
@@ -186,8 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 2),
           Text('across $count project${count == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.text2)),
+              style: const TextStyle(fontSize: 12, color: AppTheme.text2)),
         ]),
       ),
       const Icon(Icons.account_balance_wallet_rounded,
@@ -204,13 +241,12 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
-  Widget _buildProjectCard(p) {
+  Widget _buildProjectCard(BuildContext context, p) {
     final fmt = NumberFormat('#,##0', 'en_IN');
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-            builder: (_) => ProjectScreen(slug: p.slug)),
+        MaterialPageRoute(builder: (_) => ProjectScreen(slug: p.slug)),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -239,8 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
               Text(p.name,
                   style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 14, fontWeight: FontWeight.w700,
                       color: AppTheme.text)),
               const SizedBox(height: 2),
               Text(
@@ -249,8 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 11, color: AppTheme.text2)),
             ]),
           ),
-          const Icon(Icons.chevron_right_rounded,
-              color: AppTheme.text3),
+          const Icon(Icons.chevron_right_rounded, color: AppTheme.text3),
         ]),
       ),
     );
