@@ -15,7 +15,7 @@ Built for personal use — no cloud service, no subscriptions, no ads. Your data
 - Export any project to a formatted Excel file with charts
 - Auto-sync to Google Drive — web app pulls on startup and pushes after every change, Flutter app fetches on open and pushes after every change
 - Use the CLI fully from a terminal, including on Android via Termux
-- Manage expenses on Android via a Flutter app that reads and writes directly to Drive
+- Manage expenses on Android via a Flutter app that signs in with your own Google account and reads/writes directly to your Drive
 
 ---
 
@@ -53,8 +53,6 @@ Ledger/
 ├── templates/              ← Jinja2 HTML templates for Flask
 └── ledger_viewer/          ← Flutter mobile app
     ├── lib/
-    ├── assets/
-    │   └── service_account.json  ← YOUR Drive service account key (add manually)
     └── pubspec.yaml
 ```
 
@@ -246,7 +244,7 @@ This lets you save your project JSONs to your personal Google Drive and keep all
 
 **Flutter app** — fetches all projects from Drive automatically when the app opens. After every add, edit, delete, or settings change, pushes to Drive automatically. A small spinner in the title bar shows when a push is in progress.
 
-Manual **Save to Drive** and **Fetch from Drive** buttons remain available in Project Settings for on-demand sync.
+Manual **Save to Drive** and **Fetch from Drive** buttons remain available in Project Settings for on-demand sync (web app). The Flutter app has a manual refresh button and pull-to-refresh on the home screen.
 
 ### Conflict detection
 
@@ -256,13 +254,15 @@ When two devices both make changes without syncing in between, the app compares 
 
 ### Security note
 
-Never commit `credentials.json`, `token.json`, or the Flutter `service_account.json` to a public repo. All three are listed in `.gitignore` already.
+Never commit `credentials.json` or `token.json` to a public repo. Both are listed in `.gitignore` already. The Flutter app no longer uses any key file at all — see Part 3 below.
 
 ---
 
 ## Part 3 — Flutter mobile app
 
-The Flutter app connects directly to your Google Drive using a service account. It supports full expense management — add, edit, delete, and project settings — and syncs automatically with Drive on open and after every change.
+The Flutter app signs in with your own Google account (standard Google Sign-In, the same kind you see in most Android apps) and reads/writes directly to your Drive. It supports full expense management — add, edit, delete, and project settings — and syncs automatically on open and after every change.
+
+No key files, no service accounts, nothing to download and place in the project. Just one Android OAuth client to set up once, then sign in on-device exactly like signing into Gmail or any other Google app.
 
 ### Prerequisites
 
@@ -276,52 +276,43 @@ flutter doctor
 ```
 All required items (Flutter, Android toolchain, Android Studio) should show ✓.
 
-### Step 1 — Create a service account on Google Cloud
+### Step 1 — Get your debug keystore's SHA-1 fingerprint
 
-A service account is a bot credential — no login screen ever appears on the phone.
+Google needs to know which app build is allowed to use sign-in. This is identified by your package name plus a SHA-1 fingerprint derived from the keystore that signs your build.
+
+```bash
+keytool -list -v -keystore "C:\Users\<you>\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android
+```
+(On Linux/macOS the path is `~/.android/debug.keystore`)
+
+Find the line that starts with `SHA1:` and copy the full fingerprint.
+
+### Step 2 — Create an Android OAuth client on Google Cloud
 
 1. Go to https://console.cloud.google.com/ → select your `ledger-backup` project
-2. Left sidebar → **IAM & Admin → Service Accounts**
-3. **+ Create Service Account**
-4. Name: `ledger-mobile-viewer` (or anything)
-5. Click **Create and Continue** → skip the optional role fields → **Done**
-6. Click on the created service account in the list
-7. Go to the **Keys** tab → **Add Key → Create new key → JSON**
-8. A JSON file downloads — this is your service account key
+2. **APIs & Services → Credentials** (or **Google Auth Platform → Clients**)
+3. **+ Create Credentials → OAuth 2.0 Client ID**
+4. Application type: **Android**
+5. Name: anything, e.g. `LedgerAndroid`
+6. Package name: `com.adhithya.ledger_viewer` (or your own, must match `applicationId` in `android/app/build.gradle` exactly)
+7. SHA-1 certificate fingerprint: paste the value from Step 1
+8. Click **Create**
+9. No file to download — the client is now registered against your package name + SHA-1, and the app auto-detects it at sign-in time
 
-### Step 2 — Share your Drive folder with the service account
-
-1. Open the downloaded service account JSON file
-2. Find the `client_email` field — it looks like:
-   `ledger-mobile-viewer@ledger-backup.iam.gserviceaccount.com`
-3. Go to **Google Drive** in your browser
-4. Find the `LedgerJsons` folder (created automatically when you first used Save to Drive)
-5. Right-click → **Share**
-6. Paste the service account email → set permission to **Editor** → **Share**
-
-> **Editor permission is required** — the app supports adding, editing, and deleting expenses so it needs write access to Drive.
-
-> If `LedgerJsons` doesn't exist yet, start the web app, add any expense, and it will be created automatically.
+> **Important:** make sure your Gmail address is added under **OAuth consent screen → Test users**, otherwise sign-in fails with an Access Blocked error. See [DRIVE_SETUP.md](DRIVE_SETUP.md) Step 3.
 
 ### Step 3 — Set up the Flutter project
 
-**Navigate into the Flutter app folder:**
 ```bash
 cd ledger_viewer
-```
-
-**Replace the placeholder service account file:**
-
-Open `assets/service_account.json` and replace its entire contents with your real service account key JSON downloaded in Step 1.
-
-**Install Flutter dependencies:**
-```bash
 flutter pub get
 ```
 
+Nothing else needed — the Android client ID is auto-detected by `google_sign_in` from your package name and SHA-1, no client ID needs to be entered into the code.
+
 ### Step 4 — Run on emulator or device for testing
 
-Start an Android emulator from Android Studio (Device Manager → play button), then:
+Start an Android emulator from Android Studio (Device Manager → play button) — make sure it uses a system image **with Google Play Store**, not just "Google APIs", otherwise sign-in will not work. Then:
 ```bash
 flutter run
 ```
@@ -329,6 +320,8 @@ flutter run
 Or connect a real Android phone via USB with USB debugging enabled:
 - Settings → About phone → tap Build number 7 times
 - Settings → Developer options → USB debugging → ON
+
+Tap **Sign in with Google** on first launch, pick your account, and you're in.
 
 ### Step 5 — Build the release APK
 
@@ -347,9 +340,22 @@ ledger_viewer/build/app/outputs/flutter-apk/app-release.apk
 - If blocked: tap **More details → Install anyway**
 - If "Unknown sources" warning: Settings → Apps → Special app access → Install unknown apps → allow
 
+### Sharing the APK with friends or family
+
+Since this APK is signed with your debug keystore, anyone who installs it and signs in is still bound to **your** registered SHA-1 + package name — that part is about the app build, not who is using it. Any Google account can sign in, as long as it is on the test users list.
+
+1. Go to Google Cloud Console → **OAuth consent screen** (or **Google Auth Platform → Audience**) → **Test users**
+2. Click **+ Add Users** → add each friend's Gmail address
+3. Share the same APK file with them (WhatsApp, Drive link, USB — anything)
+4. They install it and sign in with their own Google account
+5. Each person's data goes to **their own personal Drive** in a `LedgerJsons` folder — completely separate from yours, nobody sees anyone else's expenses
+
+The free tier allows up to 100 test users, more than enough for sharing with friends and family. If you ever want this to be installable by literally anyone without being added as a test user, that requires Google's app verification process — unnecessary for personal/friend use.
+
 ### Flutter app features
 
-- **Home screen** — lists all projects from Drive with combined total, auto-fetches on open, pull-to-refresh
+- **Login screen** — Google Sign-In on first launch, silent auto-login on every launch after that
+- **Home screen** — lists all projects from Drive with combined total, auto-fetches on open, pull-to-refresh, sign-out option
 - **Dashboard tab** — 4 stat cards (total, average, cash, digital), category doughnut chart, category progress bars, payment mode cards, vendor list, tag breakdown, daily line chart
 - **Expenses tab** — full list with search bar and filter sheet (category, mode, tag, sort by date / amount / entry ID), tap to edit, swipe left or long press to delete, ＋ button to add
 - **Settings tab** — edit project name, icon, description, currency, add/remove/rename categories, payment modes, and tags
@@ -443,11 +449,12 @@ Push local data to Drive or pull from Drive. Shows conflict details if detected 
 
 ## Security notes
 
-- `credentials.json` — your Google OAuth client secret. Never commit to any repo.
-- `token.json` — your saved login session. Never commit to any repo.
-- `assets/service_account.json` (Flutter) — your Drive service account key. Never commit the real version.
+- `credentials.json` — your Google OAuth client secret for the web app. Never commit to any repo.
+- `token.json` — your saved login session for the web app. Never commit to any repo.
 - `data/` — your expense data. Keep off public repos — it is personal financial information.
-- All are listed in `.gitignore` and will not be pushed automatically.
+- Flutter app — no key files at all. The Android OAuth client ID is a public identifier safe to be visible in source code; security comes from the SHA-1 + package name binding registered on Google Cloud Console, not from secrecy of the ID.
+- If you ever build a **release-signed** APK (not the default debug build) to distribute more widely, the release keystore file (`.jks` / `.keystore`) and its password (`key.properties`) must never be committed — these are listed in `.gitignore`.
+- All sensitive files are listed in `.gitignore` and will not be pushed automatically.
 
 ---
 
@@ -468,8 +475,11 @@ Update to the latest `widgets.dart` — this rendering bug has been fixed.
 **Flutter APK build: Kotlin version warnings**
 These are warnings, not errors. The APK will still build and run correctly. They come from Gradle dependencies and do not affect functionality.
 
-**Flutter app cannot write to Drive**
-Make sure the service account has **Editor** permission on the `LedgerJsons` folder, not just Viewer. Right-click the folder in Drive → Share → find the service account email → change to Editor.
+**Flutter: PlatformException(sign_in_failed, ApiException: 10)**
+This means the SHA-1 fingerprint or package name registered on Google Cloud Console does not match the build that is running. Re-check Step 1 and Step 2 of the Flutter setup above — package name must match `applicationId` exactly, and the SHA-1 must be copied in full without typos.
+
+**Flutter: sign-in works on my device but fails for a friend**
+Their Gmail address is not on the test users list. Add it under OAuth consent screen → Test users.
 
 **Termux: Drive login browser does not open**
 The OAuth flow will print a URL to the terminal. Copy it manually, open it in your phone browser, complete the login, and paste the resulting code back in the terminal. Alternatively copy `token.json` from a machine that is already logged in.

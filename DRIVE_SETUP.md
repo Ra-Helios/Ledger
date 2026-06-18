@@ -14,11 +14,12 @@ The web app and Flutter mobile app both connect to your personal Google Drive to
 - Manual **Save to Drive** and **Fetch from Drive** buttons in Project Settings for on-demand sync
 
 **Flutter app behaviour:**
+- Signs in with your own Google account once, then silently stays signed in
 - Automatically fetches all projects from Drive when the app opens
 - Automatically pushes to Drive after every add, edit, delete, or settings change
 - Manual refresh button and pull-to-refresh for on-demand fetch
 
-All of this uses your own Google Drive account — no external server, no subscriptions.
+All of this uses your own Google Drive account — no external server, no subscriptions, no key files to manage on the Flutter side.
 
 ---
 
@@ -46,7 +47,7 @@ All of this uses your own Google Drive account — no external server, no subscr
 
 ## Step 3 — Set up the OAuth consent screen
 
-This tells Google what your app is when users log in. This is only needed for the web app — the Flutter app uses a service account instead.
+This tells Google what your app is when users log in. This is needed for **both** the web app and the Flutter app.
 
 1. In the left sidebar, click **APIs & Services → OAuth consent screen**
    (On newer Google Cloud UI this may appear as **Google Auth Platform**)
@@ -65,7 +66,7 @@ This tells Google what your app is when users log in. This is only needed for th
    - Click **Save and Continue**
 8. On the Summary page, click **Back to Dashboard**
 
-> **Why test users?** Google puts new OAuth apps in "Testing" mode. Only Gmail addresses you explicitly add here can log in. You must add your own email or you will get an "Access blocked" error when trying to connect.
+> **Why test users?** Google puts new OAuth apps in "Testing" mode. Only Gmail addresses you explicitly add here can log in, on either the web app or the Flutter app. You must add your own email or you will get an "Access blocked" error when trying to connect. If you later share the Flutter APK with friends, add their Gmail addresses here too — see the bottom of this guide.
 
 ---
 
@@ -84,29 +85,36 @@ This tells Google what your app is when users log in. This is only needed for th
 
 ---
 
-## Step 5 — Create a service account (Flutter app)
+## Step 5 — Create OAuth credentials (Flutter app)
 
-The Flutter app uses a service account instead of OAuth. A service account is a bot credential — no login screen ever appears on the phone.
+The Flutter app uses **Google Sign-In** — the same kind of "Sign in with Google" button you see in most Android apps. No file is downloaded or placed anywhere; the app is registered against your package name and signing certificate instead.
 
-1. In the left sidebar, click **IAM & Admin → Service Accounts**
-2. Click **+ Create Service Account**
-3. Name it anything — e.g. `ledger-mobile-viewer`
-4. Click **Create and Continue** → skip the optional role fields → **Done**
-5. Click on the created service account in the list
-6. Go to the **Keys** tab → **Add Key → Create new key → JSON**
-7. A JSON key file downloads — this is your service account key
+**Get your debug keystore's SHA-1 fingerprint:**
 
-**Then share your Drive folder with it:**
-1. Find the `client_email` field in the downloaded key file — it looks like:
-   `ledger-mobile-viewer@ledger-backup.iam.gserviceaccount.com`
-2. Go to https://drive.google.com
-3. Find the `LedgerJsons` folder (created automatically on first web app sync)
-4. Right-click → **Share**
-5. Paste the service account email → set permission to **Editor** → **Share**
+Windows:
+```bash
+keytool -list -v -keystore "C:\Users\<you>\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android
+```
 
-> **Editor permission is required** — the Flutter app now supports adding, editing, and deleting expenses, so it needs write access.
+Linux / macOS:
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+```
 
-Place the downloaded key file as `assets/service_account.json` inside the `ledger_viewer` Flutter project folder.
+Look for the line starting with `SHA1:` and copy the full value, including all the colons.
+
+**Create the Android OAuth client:**
+
+1. Still in **APIs & Services → Credentials** (or **Google Auth Platform → Clients**)
+2. **+ Create Credentials → OAuth 2.0 Client ID**
+3. Application type: **Android**
+4. Name: anything, e.g. `LedgerAndroid`
+5. Package name: `com.adhithya.ledger_viewer` (must exactly match `applicationId` in `ledger_viewer/android/app/build.gradle`)
+6. SHA-1 certificate fingerprint: paste what you copied above
+7. Click **Create**
+8. There's a **Download JSON** button on the confirmation popup — you can ignore it, nothing needs to be downloaded for Android sign-in to work. Just click **OK**
+
+That's it. The Flutter app automatically detects this client at sign-in time using your app's package name and signing certificate — there is no client ID or key file to copy anywhere in the project.
 
 ---
 
@@ -128,27 +136,58 @@ A `token.json` file is automatically saved in your project folder. This stores y
 
 ---
 
-## Step 7 — Verify it worked
+## Step 7 — First login (Flutter app)
+
+1. Build and install the app on your phone (see README.md Part 3 for build steps)
+2. Open the app — a **Sign in with Google** screen appears
+3. Tap it, choose your Google account from the native picker, allow access
+4. You're redirected straight to the home screen, and your projects load automatically
+
+Every time you reopen the app after this, it signs in silently in the background — no popup, no friction.
+
+> **If sign-in fails with "ApiException: 10"** — this means the SHA-1 or package name doesn't match what's registered on Cloud Console. Re-check Step 5 above carefully; this is almost always a copy-paste mismatch.
+
+> **If sign-in fails with "Access blocked"** — your Gmail isn't on the test users list from Step 3. Add it there.
+
+---
+
+## Step 8 — Verify it worked
 
 1. Go to https://drive.google.com
 2. You should see a folder called `LedgerJsons`
 3. Inside it, a file named `<your_project_slug>.json` (e.g. `home_renovation.json`)
 
-That file is your project's full data. It is replaced automatically every time you make a change.
+That file is your project's full data. It is replaced automatically every time you make a change, from either the web app or the Flutter app.
 
 ---
 
-## Step 8 — Setting up on a second machine
+## Step 9 — Setting up on a second machine
 
 On any other machine where you want to use Ledger with the same data:
 
+**Web app:**
 1. Clone or copy the repo to that machine
 2. Copy `credentials.json` to the project root on that machine (same file — you only create it once)
 3. Start the web app — it will auto-pull from Drive on startup
-4. Either:
-   - Let it auto-pull on startup (happens automatically)
-   - Or click **Fetch from Drive** in Project Settings if you want to force a pull
-   - Or copy `token.json` from the first machine to skip the browser login entirely
+4. Either let it auto-pull, click **Fetch from Drive** to force it, or copy `token.json` from the first machine to skip the browser login
+
+**Flutter app (a different phone, still you):**
+1. Build the APK the same way and install it
+2. Sign in with the same Google account
+3. Your projects appear automatically
+
+---
+
+## Sharing the Flutter app with friends or family
+
+The Android OAuth client you created in Step 5 is bound to your app's package name and signing certificate — not to a specific Google account. This means:
+
+1. Add each friend's Gmail address under **OAuth consent screen → Test users** (Step 3 above)
+2. Share the same APK file with them
+3. They install it and sign in with their **own** Google account
+4. Their data goes into a `LedgerJsons` folder on **their own** Drive — fully separate from yours
+
+The free testing tier supports up to 100 test users, which is plenty for sharing with friends and family. If you ever want anyone to be able to install and sign in without being explicitly added, that requires Google's app verification process, which is unnecessary overhead for personal or friend-group use.
 
 ---
 
@@ -161,7 +200,7 @@ The very first page request after `python app.py` starts triggers a background p
 Every time you add, edit, or delete an expense, or save project settings, the updated project JSON is automatically pushed to Drive in the background. This happens after the local save, so your data is always safe locally even if the push fails.
 
 **Flutter app auto-fetch on open:**
-When the app opens, it immediately fetches all projects from Drive. A loading state is shown while fetching. The last-fetched time is shown in the top bar.
+When the app opens, it signs in silently (if previously signed in) and immediately fetches all projects from Drive. A loading state is shown while fetching. The last-fetched time is shown in the top bar.
 
 **Flutter app auto-push after writes:**
 Every save (add/edit/delete expense, settings change) pushes to Drive automatically. A small spinner appears in the title bar while pushing. Push failures are silent — local state is always up to date.
@@ -224,7 +263,7 @@ Web app:
   → Close when done
 
 Flutter app:
-  → Open app  (auto-fetches from Drive)
+  → Open app  (silent sign-in, auto-fetches from Drive)
   → Add/edit/delete expenses  (auto-pushes after each change)
   → Close when done
 ```
@@ -239,14 +278,15 @@ If you work on both devices at the same time while offline, use manual sync to r
 |---|---|---|
 | `credentials.json` | OAuth client secret for web app Drive sync | ❌ Never commit |
 | `token.json` | Saved login session for web app, auto-created | ❌ Never commit |
-| `ledger_viewer/assets/service_account.json` | Service account key for Flutter app | ❌ Never commit |
 | `data/projects/*.json` | Your actual expense data | ❌ Never commit |
+
+The Flutter app uses no key files at all — its Android OAuth client ID is a public identifier safe to leave visible in source code, since security comes from the SHA-1 + package name binding on Google Cloud Console rather than secrecy of the ID itself.
 
 ---
 
 ## Troubleshooting
 
-**"Access blocked" when logging in (web app)**
+**"Access blocked" when logging in (web app or Flutter app)**
 You have not added your Gmail as a test user. Go to Google Cloud Console → OAuth consent screen (or Google Auth Platform → Audience) → Test users → Add your email.
 
 **"credentials.json not found"**
@@ -261,11 +301,17 @@ Tokens expire occasionally. Delete `token.json` and click Save/Fetch from Drive 
 **Drive folder not visible in Google Drive**
 It is created automatically on first push. Start the web app, add any expense, and the folder will appear.
 
-**Flutter app cannot write to Drive**
-Make sure the service account has **Editor** permission on the `LedgerJsons` folder, not just Viewer. Right-click the folder in Drive → Share → find the service account email → change to Editor.
+**Flutter: PlatformException(sign_in_failed, ApiException: 10)**
+The SHA-1 fingerprint or package name registered on Google Cloud Console doesn't match this build. Re-verify Step 5 above — package name must match `applicationId` in `build.gradle` exactly, and the SHA-1 must be copied without typos or missing characters.
+
+**Flutter: sign-in works for me but not for a friend I shared the APK with**
+Their Gmail address needs to be added to the test users list (Step 3), not just yours.
+
+**Flutter: emulator sign-in fails but real device works**
+Some Android emulator images don't include Google Play Store, only "Google APIs". Create a new emulator using a system image that explicitly includes Play Store, visible as a Play Store icon next to the device name in Android Studio's Device Manager.
 
 **Diverge warning appears**
 This means two devices added entries without syncing in between. The app shows the exact IDs on each side. Do not force push or pull unless you are okay losing one side's entries. Follow the manual merge steps above.
 
 **Auto-push spinner keeps showing (Flutter)**
-This is normal during a push — it disappears when done. If it stays permanently, check your internet connection and that the service account still has Editor access to the Drive folder.
+This is normal during a push — it disappears when done. If it stays permanently, check your internet connection and that you are still signed in (try the sign-out and sign-in again from the home screen menu).
